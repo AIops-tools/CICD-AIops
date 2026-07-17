@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.AIops-tools/cicd-aiops",
+  "title": "CICD AIops",
+  "description": "Governed self-managed GitLab + Gitea CI/CD ops: pipelines, runners, artifacts, RCA. 26 tools.",
+  "repository": {
+    "url": "https://github.com/AIops-tools/CICD-AIops",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "cicd-aiops",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
