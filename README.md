@@ -1,3 +1,5 @@
+<!-- mcp-name: io.github.AIops-tools/cicd-aiops -->
+
 # CICD AIops
 
 **Governed AI-ops for self-managed GitLab and self-hosted Gitea.**
