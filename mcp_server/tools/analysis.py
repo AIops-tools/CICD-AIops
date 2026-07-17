@@ -80,7 +80,9 @@ def runner_health_rca(
         saturatedTags, thresholds, note}.
     """
     if runners is None:
-        runners = ops.pull_runners(_get_connection(target))
+        from cicd_aiops.ops import runners as runner_ops
+
+        runners = runner_ops.pull_runners(_get_connection(target))
     return ops.runner_health_rca(
         runners,
         queued_jobs=queued_jobs,

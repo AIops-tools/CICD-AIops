@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.2 — 2026-07-17
+
+### Fixed
+- runner_health_rca live-pull path called a nonexistent ops.analysis.pull_runners; now dispatches to ops.runners.pull_runners (the RCA raised AttributeError on live data before).
+
+### Tests
+- Coverage raised to ~91% (governance harness + ops/CLI/connection layers).
+
 ## v0.1.1 — 2026-07-17
 
 ### Fixed
