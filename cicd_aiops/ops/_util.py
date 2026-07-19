@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from cicd_aiops.governance import sanitize
+from cicd_aiops.governance import opt_str, sanitize
 
 
 def as_obj(data: Any) -> dict:
@@ -24,6 +24,52 @@ def as_obj(data: Any) -> dict:
 def s(value: Any, limit: int = 256) -> str:
     """Sanitize an arbitrary value to a bounded, injection-safe string."""
     return sanitize(str(value if value is not None else ""), limit)
+
+
+def opt(value: Any, limit: int = 256) -> str | None:
+    """Sanitize a value that may legitimately be absent, preserving absence.
+
+    Companion to :func:`s`, which folds ``None`` into ``""``. Use this for any
+    field the server may simply not return (a pipeline with no ``ref``, a job
+    that never started, a runner that has never contacted): the caller then
+    sees ``null`` — "the server did not report this" — instead of ``""``, which
+    reads as "the field exists and is empty". A smaller local model cannot
+    recover that difference and tends to invent one.
+    """
+    return opt_str(value, limit)
+
+
+def page_limit(limit: Any, page_max: int) -> tuple[int, int]:
+    """Return ``(requested, per_page)`` so truncation can always be MEASURED.
+
+    ``per_page`` is always one greater than ``requested``, so a listing can tell
+    "there was exactly one more row" from "the list happened to end here" — the
+    truncation flag is a measurement, never a guess from
+    ``len(rows) == limit``. Because both platforms cap a page at ``page_max``
+    rows, ``requested`` is bounded at ``page_max - 1`` to keep room for that
+    extra row.
+    """
+    requested = max(1, min(int(limit), page_max - 1))
+    return requested, requested + 1
+
+
+def listing(key: str, items: list, requested: int, truncated: bool, **extra: Any) -> dict:
+    """Build the standard listing envelope around ``items``.
+
+    Every listing returns ``{..., "returned": N, "limit": L, "truncated":
+    bool, "<key>": [...]}`` so a cut-off result announces itself instead of
+    looking like a complete one. There is deliberately no ``total``: this helper
+    only sees the already-sliced page, so a total would just echo ``returned``
+    while reading like a server-side count.
+    """
+    out: dict[str, Any] = dict(extra)
+    # No "total": this helper only ever sees the already-sliced page, so any
+    # total would merely echo "returned" and read as a server-side count.
+    out["returned"] = len(items)
+    out["limit"] = requested
+    out["truncated"] = truncated
+    out[key] = items
+    return out
 
 
 def pick(row: dict, *keys: str, default: Any = None) -> Any:

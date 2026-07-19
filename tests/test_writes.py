@@ -117,7 +117,7 @@ def test_delete_artifacts_bulk_captures_inventory(monkeypatch):
         },
     )
     out = ops.delete_artifacts(conn, "1")
-    assert out["priorState"] == {"count": 2, "bytes": 300}
+    assert out["priorState"] == {"count": 2, "bytes": 300, "complete": True}
     conn.delete.assert_called_once_with("/api/v4/projects/1/artifacts")
 
 
@@ -139,7 +139,7 @@ def test_delete_artifacts_older_than_deletes_per_matching_job(monkeypatch):
     )
     out = ops.delete_artifacts(conn, "1", older_than_days=30)
     # only the January artifact matches → only job 10's artifacts deleted
-    assert out["priorState"] == {"count": 1, "bytes": 500}
+    assert out["priorState"] == {"count": 1, "bytes": 500, "complete": True}
     conn.delete.assert_called_once_with("/api/v4/projects/1/jobs/10/artifacts")
 
 

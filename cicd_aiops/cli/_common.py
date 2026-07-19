@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any
@@ -56,6 +57,34 @@ def get_connection(target: str | None, config_path: Path | None = None) -> tuple
     cfg = load_config(config_path)
     mgr = ConnectionManager(cfg)
     return mgr.connect(target), cfg
+
+
+def print_result(result: Any, hint: str = "--limit") -> None:
+    """Print a result payload as JSON, then say plainly when it was cut short.
+
+    The ``truncated`` flag is in the payload either way, but a reader — human
+    or model — skimming a long JSON dump will miss it. One trailing line costs
+    nothing and turns "this looks like everything" into "there is more".
+    ``truncated`` is a bool on listings and a per-list dict on the analyses.
+    """
+    console.print_json(json.dumps(result))
+    if not isinstance(result, dict):
+        return
+    flag = result.get("truncated")
+    cut: list[str] = []
+    if flag is True:
+        cut = ["results"]
+    elif isinstance(flag, dict):
+        cut = [k for k, v in flag.items() if v]
+    if result.get("jobScanTruncated"):
+        cut.append("the job scan the inventory was built from")
+    if result.get("charsTruncated"):
+        cut.append("the trace text (byte ceiling)")
+    if cut:
+        console.print(
+            f"[yellow]… truncated ({', '.join(cut)}) — this is NOT the full set; "
+            f"re-run with a higher {hint}.[/]"
+        )
 
 
 def dry_run_print(*, operation: str, api_call: str, parameters: dict | None = None) -> None:

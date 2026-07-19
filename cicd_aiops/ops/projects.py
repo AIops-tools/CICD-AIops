@@ -10,33 +10,47 @@ from __future__ import annotations
 
 from typing import Any
 
-from cicd_aiops.ops._util import as_obj, num, pick, s
+from cicd_aiops.ops._util import as_obj, listing, num, opt, page_limit, pick, s
 from cicd_aiops.platform import GITLAB
 
-_MAX_LIST = 200
+_MAX_LIST = 100
 
 
 def _norm_project(r: dict) -> dict:
-    """Normalise one project row across GitLab / Gitea field names."""
+    """Normalise one project row across GitLab / Gitea field names.
+
+    Artifact and total-storage bytes come from GitLab's per-project
+    ``statistics``; Gitea has no equivalent. Where they are unavailable they
+    are reported as ``None`` — NOT as ``0``. A zero here would read as "this
+    project stores no artifacts", which is a different (and wrong) claim from
+    "this platform does not report artifact storage".
+    """
     stats = as_obj(r.get("statistics"))
     return {
         "id": s(pick(r, "id")),
         "path": s(pick(r, "path_with_namespace", "full_name", "path")),
-        "defaultBranch": s(pick(r, "default_branch")),
+        "defaultBranch": opt(pick(r, "default_branch")),
         "archived": bool(pick(r, "archived", default=False)),
-        "lastActivity": s(pick(r, "last_activity_at", "updated_at")),
+        "lastActivity": opt(pick(r, "last_activity_at", "updated_at")),
         "repoBytes": num(
             pick(stats, "repository_size", default=num(r.get("size")) * 1024)
         ),
-        "artifactsBytes": num(pick(stats, "job_artifacts_size", default=0)),
-        "storageBytes": num(pick(stats, "storage_size", default=0)),
+        "artifactsBytes": (
+            num(stats["job_artifacts_size"]) if "job_artifacts_size" in stats else None
+        ),
+        "storageBytes": num(stats["storage_size"]) if "storage_size" in stats else None,
     }
 
 
 def list_projects(conn: Any, search: str | None = None, limit: int = 50) -> dict:
-    """[READ] Projects/repositories the token can see, normalized."""
+    """[READ] Projects/repositories the token can see, normalized.
+
+    Returns ``{projects, returned, limit, truncated}``; one row beyond ``limit``
+    is requested so ``truncated`` is measured, not inferred from a full page.
+    """
     try:
-        params: dict[str, Any] = {"per_page": min(max(1, int(limit)), _MAX_LIST)}
+        requested, per_page = page_limit(limit, _MAX_LIST)
+        params: dict[str, Any] = {"per_page": per_page}
         if conn.target.platform == GITLAB:
             params["statistics"] = "true"
             params["membership"] = "true"
@@ -44,8 +58,9 @@ def list_projects(conn: Any, search: str | None = None, limit: int = 50) -> dict
         if search:
             params["q" if conn.target.platform != GITLAB else "search"] = s(search, 64)
         rows = conn.platform.rows(conn.get(conn.platform.path("projects"), params=params))
-        projects = [_norm_project(r) for r in rows][: max(1, int(limit))]
-        return {"total": len(projects), "projects": projects}
+        truncated = len(rows) > requested
+        projects = [_norm_project(r) for r in rows[:requested]]
+        return listing("projects", projects, requested, truncated)
     except Exception as exc:  # noqa: BLE001 — report as partial
         return {"error": s(exc, 200)}
 

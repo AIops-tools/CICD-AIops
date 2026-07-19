@@ -15,6 +15,7 @@ from cicd_aiops.cli._common import (
     double_confirm,
     dry_run_print,
     get_connection,
+    print_result,
 )
 
 artifacts_app = typer.Typer(
@@ -28,12 +29,16 @@ ProjectArg = Annotated[str, typer.Argument(help="Project id or full path")]
 
 @artifacts_app.command("list")
 @cli_errors
-def artifacts_list(project: ProjectArg, target: TargetOption = None) -> None:
+def artifacts_list(
+    project: ProjectArg,
+    limit: Annotated[int, typer.Option("--limit", "-n", help="Max rows")] = 500,
+    target: TargetOption = None,
+) -> None:
     """List a project's artifacts with sizes and expiry."""
     from cicd_aiops.ops import artifacts as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.list_artifacts(conn, project)))
+    print_result(ops.list_artifacts(conn, project, limit=limit))
 
 
 @artifacts_app.command("delete")

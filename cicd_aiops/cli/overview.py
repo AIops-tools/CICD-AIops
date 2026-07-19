@@ -7,7 +7,13 @@ from typing import Annotated
 
 import typer
 
-from cicd_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from cicd_aiops.cli._common import (
+    TargetOption,
+    cli_errors,
+    console,
+    get_connection,
+    print_result,
+)
 
 
 @cli_errors
@@ -31,4 +37,4 @@ def projects_cmd(
     from cicd_aiops.ops import projects as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.list_projects(conn, search=search, limit=limit)))
+    print_result(ops.list_projects(conn, search=search, limit=limit))

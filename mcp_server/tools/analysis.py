@@ -190,7 +190,7 @@ def stale_work_audit(
             protections = pulled.get("protections", []) if isinstance(pulled, dict) else []
         if not default_branch:
             detail = project_ops.project_detail(conn, project)
-            default_branch = detail.get("defaultBranch", "") if isinstance(detail, dict) else ""
+            default_branch = (detail.get("defaultBranch") or "") if isinstance(detail, dict) else ""
     return ops.stale_work_audit(
         merge_requests,
         branches,

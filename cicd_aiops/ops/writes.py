@@ -122,6 +122,11 @@ def delete_artifacts(conn: Any, project: str, older_than_days: float = 0.0) -> d
     """
     inventory = artifact_ops.list_artifacts(conn, project)
     rows = inventory.get("artifacts", []) if "error" not in inventory else []
+    # The inventory read is itself bounded; say so rather than letting a
+    # partial count read as an exact one.
+    inventory_partial = bool(
+        inventory.get("truncated") or inventory.get("jobScanTruncated")
+    )
     if older_than_days and older_than_days > 0:
         matching = [
             a for a in rows if (age_days(a.get("createdAt")) or 0) >= older_than_days
@@ -144,8 +149,14 @@ def delete_artifacts(conn: Any, project: str, older_than_days: float = 0.0) -> d
         "priorState": {
             "count": len(deleted_rows),
             "bytes": sum(num(a.get("sizeBytes")) for a in deleted_rows),
+            "complete": not inventory_partial,
         },
-        "note": "Irreversible — priorState records what was destroyed; no undo.",
+        "note": (
+            "Irreversible — priorState records what was destroyed; no undo."
+            if not inventory_partial
+            else "Irreversible — no undo. priorState is a LOWER BOUND: the "
+            "artifact inventory it was measured from was itself truncated."
+        ),
     }
 
 

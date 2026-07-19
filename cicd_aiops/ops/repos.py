@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cicd_aiops.ops._util import as_obj, pick, s
+from cicd_aiops.ops._util import as_obj, listing, opt, page_limit, pick, s
 
 _MAX_LIST = 100
 
@@ -21,11 +21,11 @@ def norm_merge_request(r: dict) -> dict:
         "id": s(pick(r, "iid", "number", "id")),
         "title": s(pick(r, "title"), 160),
         "state": s(pick(r, "state"), 32).lower(),
-        "author": s(pick(author, "username", "login", default="")),
-        "sourceBranch": s(pick(r, "source_branch", default=s(pick(as_obj(r.get("head")), "ref")))),
-        "targetBranch": s(pick(r, "target_branch", default=s(pick(as_obj(r.get("base")), "ref")))),
-        "createdAt": s(pick(r, "created_at")),
-        "updatedAt": s(pick(r, "updated_at")),
+        "author": opt(pick(author, "username", "login")),
+        "sourceBranch": opt(pick(r, "source_branch", default=pick(as_obj(r.get("head")), "ref"))),
+        "targetBranch": opt(pick(r, "target_branch", default=pick(as_obj(r.get("base")), "ref"))),
+        "createdAt": opt(pick(r, "created_at")),
+        "updatedAt": opt(pick(r, "updated_at")),
         "draft": bool(pick(r, "draft", "work_in_progress", default=False)),
     }
 
@@ -40,12 +40,14 @@ def list_merge_requests(
         param_state = want
         if want in ("open", "opened"):
             param_state = "opened" if conn.platform.uses_private_token else "open"
-        params = {"state": param_state, "per_page": min(max(1, int(limit)), _MAX_LIST)}
+        requested, per_page = page_limit(limit, _MAX_LIST)
+        params = {"state": param_state, "per_page": per_page}
         rows = conn.platform.rows(
             conn.get(conn.platform.path("merge_requests", project=project), params=params)
         )
-        mrs = [norm_merge_request(r) for r in rows][: max(1, int(limit))]
-        return {"project": s(project), "total": len(mrs), "mergeRequests": mrs}
+        truncated = len(rows) > requested
+        mrs = [norm_merge_request(r) for r in rows[:requested]]
+        return listing("mergeRequests", mrs, requested, truncated, project=s(project))
     except Exception as exc:  # noqa: BLE001 — report as partial
         return {"error": s(exc, 200), "project": s(project)}
 
@@ -57,13 +59,8 @@ def norm_branch(r: dict) -> dict:
         "name": s(pick(r, "name")),
         "default": bool(pick(r, "default", default=False)),
         "protected": bool(pick(r, "protected", default=False)),
-        "lastCommitAt": s(
-            pick(
-                commit,
-                "committed_date",
-                "timestamp",
-                default=s(pick(r, "updated_at", default="")),
-            )
+        "lastCommitAt": opt(
+            pick(commit, "committed_date", "timestamp", default=pick(r, "updated_at"))
         ),
     }
 
@@ -71,12 +68,14 @@ def norm_branch(r: dict) -> dict:
 def list_branches(conn: Any, project: str, limit: int = 100) -> dict:
     """[READ] Branches with last-commit date and protected flag."""
     try:
-        params = {"per_page": min(max(1, int(limit)), _MAX_LIST)}
+        requested, per_page = page_limit(limit, _MAX_LIST)
+        params = {"per_page": per_page}
         rows = conn.platform.rows(
             conn.get(conn.platform.path("branches", project=project), params=params)
         )
-        branches = [norm_branch(r) for r in rows][: max(1, int(limit))]
-        return {"project": s(project), "total": len(branches), "branches": branches}
+        truncated = len(rows) > requested
+        branches = [norm_branch(r) for r in rows[:requested]]
+        return listing("branches", branches, requested, truncated, project=s(project))
     except Exception as exc:  # noqa: BLE001 — report as partial
         return {"error": s(exc, 200), "project": s(project)}
 
@@ -90,14 +89,22 @@ def norm_protection(r: dict) -> dict:
     }
 
 
-def list_protected_branches(conn: Any, project: str) -> dict:
-    """[READ] Branch-protection rules for a project."""
+def list_protected_branches(conn: Any, project: str, limit: int = _MAX_LIST) -> dict:
+    """[READ] Branch-protection rules for a project.
+
+    The endpoint returns the complete rule set, so truncation is measured
+    against the full fetched list rather than by over-fetching a page.
+    """
     try:
         rows = conn.platform.rows(
             conn.get(conn.platform.path("protected_branches", project=project))
         )
-        protections = [norm_protection(r) for r in rows]
-        return {"project": s(project), "total": len(protections), "protections": protections}
+        requested = max(1, int(limit))
+        truncated = len(rows) > requested
+        protections = [norm_protection(r) for r in rows[:requested]]
+        return listing(
+            "protections", protections, requested, truncated, project=s(project)
+        )
     except Exception as exc:  # noqa: BLE001 — report as partial
         return {"error": s(exc, 200), "project": s(project)}
 
@@ -105,20 +112,22 @@ def list_protected_branches(conn: Any, project: str) -> dict:
 def list_releases(conn: Any, project: str, limit: int = 20) -> dict:
     """[READ] Releases for a project, newest first."""
     try:
-        params = {"per_page": min(max(1, int(limit)), _MAX_LIST)}
+        requested, per_page = page_limit(limit, _MAX_LIST)
+        params = {"per_page": per_page}
         rows = conn.platform.rows(
             conn.get(conn.platform.path("releases", project=project), params=params)
         )
+        truncated = len(rows) > requested
         releases = [
             {
                 "tag": s(pick(r, "tag_name")),
-                "name": s(pick(r, "name"), 160),
-                "createdAt": s(pick(r, "created_at")),
+                "name": opt(pick(r, "name"), 160),
+                "createdAt": opt(pick(r, "created_at")),
                 "draft": bool(pick(r, "draft", "upcoming_release", default=False)),
                 "prerelease": bool(pick(r, "prerelease", default=False)),
             }
-            for r in rows
-        ][: max(1, int(limit))]
-        return {"project": s(project), "total": len(releases), "releases": releases}
+            for r in rows[:requested]
+        ]
+        return listing("releases", releases, requested, truncated, project=s(project))
     except Exception as exc:  # noqa: BLE001 — report as partial
         return {"error": s(exc, 200), "project": s(project)}

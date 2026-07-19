@@ -92,7 +92,7 @@ def test_list_runners_passes_status_filter_and_partial_error():
         {"id": 1, "status": "online", "online": True, "paused": False},
     ]})
     ok = runners.list_runners(conn, status="Online")
-    assert ok["total"] == 1
+    assert ok["returned"] == 1
     assert "error" in runners.list_runners(_RaisingConn())
 
 
@@ -130,7 +130,7 @@ def test_list_projects_search_param_and_gitea_size():
     gl = _Conn({_p(GITLAB, "projects"): [
         {"id": 1, "path_with_namespace": "dev/api"},
     ]})
-    assert projects.list_projects(gl, search="api")["total"] == 1
+    assert projects.list_projects(gl, search="api")["returned"] == 1
     gt = _Conn(
         {_p(GITEA, "projects"): {"data": [{"id": 2, "full_name": "dev/web", "size": 4}]}},
         platform=GITEA,
@@ -162,7 +162,7 @@ def test_list_pipelines_status_filter_and_all_partial_errors():
     conn = _Conn({_p(GITLAB, "pipelines", project="1"): [
         {"id": 1, "status": "failed", "ref": "main"},
     ]})
-    assert pipelines.list_pipelines(conn, "1", status="failed")["total"] == 1
+    assert pipelines.list_pipelines(conn, "1", status="failed")["returned"] == 1
     rc = _RaisingConn()
     assert "error" in pipelines.list_pipelines(rc, "1")
     assert "error" in pipelines.pipeline_detail(rc, "1", "9")
@@ -193,7 +193,7 @@ def test_list_artifacts_skips_non_dict_files():
          "finished_at": "2026-07-01T00:00:00Z"},
     ]})
     out = artifacts.list_artifacts(conn, "1")
-    assert out["total"] == 1 and out["totalBytes"] == 10  # the string is ignored
+    assert out["returned"] == 1 and out["totalBytes"] == 10  # the string is ignored
 
 
 @pytest.mark.unit

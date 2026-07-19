@@ -30,17 +30,25 @@ def cicd_overview(conn: Any) -> dict:
         user = {}
 
     pl = project_ops.list_projects(conn, limit=100)
-    project_total = pl.get("total") if isinstance(pl, dict) and "error" not in pl else None
+    projects_ok = isinstance(pl, dict) and "error" not in pl
+    project_total = pl.get("returned") if projects_ok else None
+    projects_truncated = bool(pl.get("truncated")) if projects_ok else False
     if isinstance(pl, dict) and "error" in pl:
         errors.append(f"projects: {pl['error']}")
 
+    # Runner administration is a GitLab-only surface. On Gitea the counts stay
+    # null and 'runnersSupported' says why — a null that means "this platform
+    # has no runner API" must never be read as "there are no runners".
+    runners_supported = conn.platform.supports("runners")
     runners_total = runners_online = None
-    if conn.platform.supports("runners"):
+    runners_truncated = False
+    if runners_supported:
         rl = runner_ops.list_runners(conn)
         if isinstance(rl, dict) and "error" not in rl:
             rows = rl.get("runners", [])
-            runners_total = rl.get("total")
+            runners_total = rl.get("returned")
             runners_online = sum(1 for r in rows if r.get("online"))
+            runners_truncated = bool(rl.get("truncated"))
         elif isinstance(rl, dict):
             errors.append(f"runners: {rl['error']}")
 
@@ -50,7 +58,16 @@ def cicd_overview(conn: Any) -> dict:
         "version": ver.get("version"),
         "authenticatedAs": user.get("username"),
         "projectsTotal": project_total,
+        "projectsTruncated": projects_truncated,
+        "runnersSupported": runners_supported,
         "runnersTotal": runners_total,
         "runnersOnline": runners_online,
+        "runnersTruncated": runners_truncated,
         "errors": errors,
+        "note": (
+            "Counts are what this call returned, not server-wide totals; a "
+            "'*Truncated' flag means there were more. runnersSupported=false "
+            "means this platform has no runner API — the null runner counts "
+            "are 'not available here', not 'zero'."
+        ),
     }

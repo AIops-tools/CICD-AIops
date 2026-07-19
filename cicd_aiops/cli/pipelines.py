@@ -15,6 +15,7 @@ from cicd_aiops.cli._common import (
     double_confirm,
     dry_run_print,
     get_connection,
+    print_result,
 )
 
 pipelines_app = typer.Typer(
@@ -40,7 +41,7 @@ def pipelines_list(
     from cicd_aiops.ops import pipelines as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.list_pipelines(conn, project, status=status, limit=limit)))
+    print_result(ops.list_pipelines(conn, project, status=status, limit=limit))
 
 
 @pipelines_app.command("show")
@@ -62,13 +63,14 @@ def pipelines_show(
 def pipelines_jobs(
     project: ProjectArg,
     pipeline: Annotated[str, typer.Argument(help="Pipeline id (from 'pipelines list')")],
+    limit: Annotated[int, typer.Option("--limit", "-n", help="Max jobs")] = 100,
     target: TargetOption = None,
 ) -> None:
     """List one pipeline's jobs with status + failure reason."""
     from cicd_aiops.ops import pipelines as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.pipeline_jobs(conn, project, pipeline)))
+    print_result(ops.pipeline_jobs(conn, project, pipeline, limit=limit))
 
 
 @pipelines_app.command("trace")
@@ -83,7 +85,7 @@ def pipelines_trace(
     from cicd_aiops.ops import pipelines as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.job_trace_tail(conn, project, job, tail_lines=lines)))
+    print_result(ops.job_trace_tail(conn, project, job, tail_lines=lines), hint="--lines")
 
 
 @pipelines_app.command("retry")

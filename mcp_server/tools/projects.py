@@ -17,9 +17,12 @@ def list_projects(
 ) -> dict:
     """[READ] Projects/repositories the token can see, with storage numbers.
 
+    Returns {projects:[...], returned, limit, truncated}; 'truncated' true means
+    the server had more projects than were returned (measured, not guessed).
+
     Args:
         search: Optional name filter.
-        limit: Max rows to return (default 50).
+        limit: Max rows to return (default 50, max 99).
         target: Server target name from config; omit for the default.
     """
     return ops.list_projects(_get_connection(target), search=search, limit=limit)

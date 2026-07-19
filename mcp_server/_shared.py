@@ -75,7 +75,7 @@ def tool_errors(shape: str = "dict") -> Callable:
 mcp = FastMCP(
     "cicd-aiops",
     instructions=(
-        "CI/CD operations (preview) over self-managed GitLab and self-hosted "
+        "CI/CD operations over self-managed GitLab and self-hosted "
         "Gitea: server version and token identity; projects with storage "
         "statistics; pipelines, jobs and trace tails; runners; merge/pull "
         "requests, branches, protection rules and releases; artifact "

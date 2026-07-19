@@ -26,9 +26,20 @@ from datetime import datetime
 from typing import Any
 
 from cicd_aiops.ops import pipelines as pipe_ops
-from cicd_aiops.ops._util import age_days, age_seconds, num, s
+from cicd_aiops.ops._util import age_days, age_seconds, num, opt, s
 
 MAX_ROWS = 100
+
+
+def _cut(rows: list, limit: int = MAX_ROWS) -> tuple[list, bool]:
+    """Cap a findings list at ``limit``, MEASURING whether anything was dropped.
+
+    Analyses cap their findings so a result stays readable. That cap used to be
+    silent: a model reading 100 findings could not tell whether it had all of
+    them. ``_cut`` returns the flag alongside the rows, and every analysis
+    reports it under ``truncated``.
+    """
+    return rows[:limit], len(rows) > limit
 
 # ── 1. pipeline-failure RCA ──────────────────────────────────────────────────
 DEFAULT_FAILED_PIPELINES = 10
@@ -145,7 +156,12 @@ def pull_failed_pipelines(
     limit: int = DEFAULT_FAILED_PIPELINES,
     tail_lines: int = pipe_ops.DEFAULT_TRACE_TAIL_LINES,
 ) -> list[dict]:
-    """[READ] Live failed pipelines with their failed jobs + trace tails."""
+    """[READ] Live failed pipelines with their failed jobs + trace tails.
+
+    Each failed job carries ``traceTruncated`` — the trace is only the tail, so
+    the first error may have scrolled off. A classification drawn from a
+    truncated tail is a hypothesis, not a verdict.
+    """
     listed = pipe_ops.list_pipelines(conn, project, status="failed", limit=limit)
     out: list[dict] = []
     for p in listed.get("pipelines", []) if isinstance(listed, dict) else []:
@@ -157,6 +173,11 @@ def pull_failed_pipelines(
             trace = pipe_ops.job_trace_tail(conn, project, j["id"], tail_lines=tail_lines)
             j = dict(j)
             j["traceTail"] = trace.get("trace", "") if isinstance(trace, dict) else ""
+            # The trace is a tail: earlier lines may hold the real first error.
+            j["traceTruncated"] = bool(
+                isinstance(trace, dict)
+                and (trace.get("truncated") or trace.get("charsTruncated"))
+            )
             failed_jobs.append(j)
         entry = dict(p)
         entry["jobs"] = failed_jobs
@@ -184,11 +205,12 @@ def pipeline_failure_rca(failed_pipelines: list[dict]) -> dict:
                 continue
             finding = {
                 "job": s(job.get("name")),
-                "stage": s(job.get("stage", "")),
+                "stage": opt(job.get("stage")),
             }
             finding.update(classify_job_failure(job))
             job_findings.append(finding)
             class_counts[finding["class"]] = class_counts.get(finding["class"], 0) + 1
+        jobs_shown, jobs_truncated = _cut(job_findings)
         results.append(
             {
                 "pipeline": s(p.get("id")),
@@ -198,14 +220,19 @@ def pipeline_failure_rca(failed_pipelines: list[dict]) -> dict:
                 "No failed job rows available for this pipeline",
                 "action": job_findings[0]["action"] if job_findings else
                 "Pull the pipeline's jobs and traces, then re-run the RCA.",
-                "failedJobs": job_findings[:MAX_ROWS],
+                "failedJobs": jobs_shown,
+                "failedJobsTruncated": jobs_truncated,
             }
         )
 
+    shown, truncated = _cut(results)
     return {
         "pipelinesEvaluated": len(results),
         "classCounts": class_counts,
-        "pipelines": results[:MAX_ROWS],
+        "pipelines": shown,
+        "returned": len(shown),
+        "limit": MAX_ROWS,
+        "truncated": truncated,
         "note": (
             "Advisory read-only heuristic: failed jobs are classified by "
             "failure_reason and trace-tail markers (OOM > timeout > network > "
@@ -270,7 +297,7 @@ def runner_health_rca(
         flagged_runners.append(
             {
                 "id": s(r.get("id")),
-                "description": s(r.get("description")),
+                "description": opt(r.get("description")),
                 "status": s(r.get("status")),
                 "online": online,
                 "paused": paused,
@@ -325,11 +352,20 @@ def runner_health_rca(
             )
     saturated_tags.sort(key=lambda t: t["queuedJobs"], reverse=True)
 
+    flagged_shown, flagged_cut = _cut(flagged_runners)
+    queued_shown, queued_cut = _cut(long_queued)
+    tags_shown, tags_cut = _cut(saturated_tags)
     return {
         "runnersEvaluated": len(runners or []),
-        "flaggedRunners": flagged_runners[:MAX_ROWS],
-        "longQueuedJobs": long_queued[:MAX_ROWS],
-        "saturatedTags": saturated_tags[:MAX_ROWS],
+        "flaggedRunners": flagged_shown,
+        "longQueuedJobs": queued_shown,
+        "saturatedTags": tags_shown,
+        "limit": MAX_ROWS,
+        "truncated": {
+            "flaggedRunners": flagged_cut,
+            "longQueuedJobs": queued_cut,
+            "saturatedTags": tags_cut,
+        },
         "thresholds": {
             "staleContactMin": stale_contact_min,
             "queueSec": queue_sec,
@@ -363,9 +399,12 @@ def artifact_storage_bloat_analysis(
     """
     ranked = []
     total_reclaimable = 0.0
+    art_bytes_unknown = 0
     for p in projects or []:
         path = s(p.get("path"))
         repo_b = num(p.get("repoBytes"))
+        art_known = p.get("artifactsBytes") is not None
+        art_bytes_unknown += 0 if art_known else 1
         art_b = num(p.get("artifactsBytes"))
         rows = (artifacts_by_project or {}).get(path, [])
         expired_b = old_b = 0.0
@@ -386,7 +425,8 @@ def artifact_storage_bloat_analysis(
             {
                 "project": path,
                 "repoBytes": repo_b,
-                "artifactsBytes": art_b,
+                "artifactsBytes": art_b if art_known else None,
+                "artifactsBytesKnown": art_known,
                 "totalBytes": repo_b + art_b,
                 "expiredButKept": expired_n,
                 "expiredBytes": expired_b,
@@ -403,16 +443,24 @@ def artifact_storage_bloat_analysis(
         )
     ranked.sort(key=lambda e: e["totalBytes"], reverse=True)
 
+    shown, truncated = _cut(ranked)
     return {
         "projectsEvaluated": len(ranked),
         "totalReclaimableBytes": total_reclaimable,
+        "artifactBytesUnavailable": art_bytes_unknown,
         "thresholds": {"oldArtifactDays": old_artifact_days},
-        "projects": ranked[:MAX_ROWS],
+        "projects": shown,
+        "returned": len(shown),
+        "limit": MAX_ROWS,
+        "truncated": truncated,
         "note": (
             "Advisory read-only heuristic: projects ranked by repo + artifact "
             "bytes; reclaimable = expired-but-kept artifacts plus artifacts "
             "older than oldArtifactDays. Verify before deleting — sizes come "
-            "from the server's own statistics."
+            "from the server's own statistics. 'artifactsBytesKnown': false "
+            "(counted in artifactBytesUnavailable) means the platform does not "
+            "report artifact storage for that project — it is unmeasured, NOT "
+            "zero, and such a project is ranked on repo bytes alone."
         ),
     }
 
@@ -505,10 +553,19 @@ def stale_work_audit(
                 }
             )
 
+    mrs_shown, mrs_cut = _cut(stale_mrs)
+    branches_shown, branches_cut = _cut(stale_branches)
+    gaps_shown, gaps_cut = _cut(gaps)
     return {
-        "staleMergeRequests": stale_mrs[:MAX_ROWS],
-        "staleBranches": stale_branches[:MAX_ROWS],
-        "protectionGaps": gaps[:MAX_ROWS],
+        "staleMergeRequests": mrs_shown,
+        "staleBranches": branches_shown,
+        "protectionGaps": gaps_shown,
+        "limit": MAX_ROWS,
+        "truncated": {
+            "staleMergeRequests": mrs_cut,
+            "staleBranches": branches_cut,
+            "protectionGaps": gaps_cut,
+        },
         "counts": {
             "staleMergeRequests": len(stale_mrs),
             "staleBranches": len(stale_branches),

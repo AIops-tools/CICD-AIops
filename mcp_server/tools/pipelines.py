@@ -18,10 +18,15 @@ def list_pipelines(
 ) -> dict:
     """[READ] Recent pipelines/runs for a project, newest first.
 
+    Returns {project, pipelines:[...], returned, limit, truncated}. When
+    'truncated' is true the server had MORE pipelines than were returned —
+    re-run with a higher limit rather than treating the list as complete.
+    Truncation is measured (one extra row is fetched), never guessed.
+
     Args:
         project: Project id or full path ('group/project' / 'owner/repo').
         status: Optional status filter (e.g. failed, success, running, pending).
-        limit: Max rows to return (default 20).
+        limit: Max rows to return (default 20, max 99).
         target: Server target name from config; omit for the default.
     """
     return ops.list_pipelines(_get_connection(target), project, status=status, limit=limit)
@@ -44,15 +49,24 @@ def pipeline_detail(project: str, pipeline: str, target: Optional[str] = None) -
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def pipeline_jobs(project: str, pipeline: str, target: Optional[str] = None) -> dict:
+def pipeline_jobs(
+    project: str,
+    pipeline: str,
+    limit: int = 100,
+    target: Optional[str] = None,
+) -> dict:
     """[READ] Jobs of one pipeline/run with status + failure reason.
+
+    Returns {project, pipeline, jobs:[...], returned, limit, truncated}. When
+    'truncated' is true this pipeline had more jobs than were returned.
 
     Args:
         project: Project id or full path.
         pipeline: Pipeline/run id (from list_pipelines).
+        limit: Max job rows to return (default 100).
         target: Server target name from config; omit for the default.
     """
-    return ops.pipeline_jobs(_get_connection(target), project, pipeline)
+    return ops.pipeline_jobs(_get_connection(target), project, pipeline, limit=limit)
 
 
 @mcp.tool()
@@ -65,6 +79,12 @@ def job_trace_tail(
     target: Optional[str] = None,
 ) -> dict:
     """[READ] The tail of one job's log/trace — where the failure explains itself.
+
+    Returns {project, job, trace, totalLines, tailLines, returned, limit,
+    truncated, charsTruncated}. 'truncated' true means earlier lines were
+    dropped (the trace is only the tail — the FIRST error may be above the
+    window, so raise tail_lines before concluding a root cause);
+    'charsTruncated' true means the tail itself hit the byte ceiling.
 
     Args:
         project: Project id or full path.

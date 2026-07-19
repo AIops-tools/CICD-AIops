@@ -1,6 +1,7 @@
 # cicd-aiops — capabilities reference
 
-26 governed MCP tools over two platforms. Every tool takes an optional
+28 governed MCP tools over two platforms (16 reads + 4 analyses + 6 writes +
+`undo_list`/`undo_apply`). Every tool takes an optional
 `target` (a name from `~/.cicd-aiops/config.yaml`); writes also take
 `dry_run: bool`.
 

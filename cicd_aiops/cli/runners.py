@@ -15,6 +15,7 @@ from cicd_aiops.cli._common import (
     double_confirm,
     dry_run_print,
     get_connection,
+    print_result,
 )
 
 runners_app = typer.Typer(
@@ -30,13 +31,14 @@ def runners_list(
     status: Annotated[
         str | None, typer.Option("--status", help="Filter: online, offline, paused, stale")
     ] = None,
+    limit: Annotated[int, typer.Option("--limit", "-n", help="Max rows")] = 100,
     target: TargetOption = None,
 ) -> None:
-    """List runners, offline/paused first."""
+    """List runners, offline/paused first (GitLab only; Gitea has no runner API)."""
     from cicd_aiops.ops import runners as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.list_runners(conn, status=status)))
+    print_result(ops.list_runners(conn, status=status, limit=limit))
 
 
 @runners_app.command("show")

@@ -21,7 +21,8 @@ def list_merge_requests(
     Args:
         project: Project id or full path ('group/project' / 'owner/repo').
         state: opened/open, merged, closed, all (platform word is translated).
-        limit: Max rows to return (default 50).
+        limit: Max rows to return (default 50, max 99); the result carries
+            'truncated' when the server had more.
         target: Server target name from config; omit for the default.
     """
     return ops.list_merge_requests(_get_connection(target), project, state=state, limit=limit)
@@ -35,7 +36,8 @@ def list_branches(project: str, limit: int = 100, target: Optional[str] = None) 
 
     Args:
         project: Project id or full path.
-        limit: Max rows to return (default 100).
+        limit: Max rows to return (default 100, capped at 99); the result
+            carries 'truncated' when the server had more.
         target: Server target name from config; omit for the default.
     """
     return ops.list_branches(_get_connection(target), project, limit=limit)
@@ -44,14 +46,19 @@ def list_branches(project: str, limit: int = 100, target: Optional[str] = None) 
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def list_protected_branches(project: str, target: Optional[str] = None) -> dict:
+def list_protected_branches(
+    project: str, limit: int = 100, target: Optional[str] = None
+) -> dict:
     """[READ] Branch-protection rules for a project (incl. force-push flags).
+
+    Returns {project, protections:[...], returned, limit, truncated}.
 
     Args:
         project: Project id or full path.
+        limit: Max rows to return (default 100).
         target: Server target name from config; omit for the default.
     """
-    return ops.list_protected_branches(_get_connection(target), project)
+    return ops.list_protected_branches(_get_connection(target), project, limit=limit)
 
 
 @mcp.tool()
@@ -62,7 +69,8 @@ def list_releases(project: str, limit: int = 20, target: Optional[str] = None) -
 
     Args:
         project: Project id or full path.
-        limit: Max rows to return (default 20).
+        limit: Max rows to return (default 20, max 99); the result carries
+            'truncated' when the server had more.
         target: Server target name from config; omit for the default.
     """
     return ops.list_releases(_get_connection(target), project, limit=limit)

@@ -65,7 +65,7 @@ def test_list_projects_gitlab_statistics():
         ]
     })
     out = projects.list_projects(conn)
-    assert out["total"] == 1
+    assert out["returned"] == 1
     p = out["projects"][0]
     assert p["path"] == "dev/api"
     assert p["repoBytes"] == 1000 and p["artifactsBytes"] == 500
@@ -80,7 +80,7 @@ def test_list_projects_gitea_search_shape():
         platform=GITEA,
     )
     out = projects.list_projects(conn)
-    assert out["total"] == 1
+    assert out["returned"] == 1
     # Gitea reports size in KiB → bytes
     assert out["projects"][0]["repoBytes"] == 2048
 
@@ -97,7 +97,7 @@ def test_list_pipelines_gitlab_shape():
         ]
     })
     out = pipelines.list_pipelines(conn, "1")
-    assert out["total"] == 2
+    assert out["returned"] == 2
     assert out["pipelines"][0]["status"] == "failed"
 
 
@@ -110,7 +110,7 @@ def test_list_pipelines_gitea_workflow_runs_shape():
         platform=GITEA,
     )
     out = pipelines.list_pipelines(conn, "dev/web")
-    assert out["total"] == 1
+    assert out["returned"] == 1
     assert out["pipelines"][0]["ref"] == "main"
 
 
@@ -153,7 +153,7 @@ def test_list_runners_sorts_offline_first():
         ]
     })
     out = runners.list_runners(conn)
-    assert out["total"] == 2
+    assert out["returned"] == 2
     assert out["runners"][0]["description"] == "dead"
 
 
@@ -205,7 +205,7 @@ def test_list_branches_reads_commit_dates():
         ]
     })
     out = repos.list_branches(conn, "1")
-    assert out["total"] == 2
+    assert out["returned"] == 2
     assert out["branches"][0]["default"] is True
     assert out["branches"][1]["lastCommitAt"].startswith("2025-01-01")
 
@@ -260,7 +260,7 @@ def test_list_artifacts_gitlab_flattens_job_files_and_counts_expired():
         ]
     })
     out = artifacts.list_artifacts(conn, "1")
-    assert out["total"] == 2
+    assert out["returned"] == 2
     assert out["totalBytes"] == 1010
     assert out["expiredButKept"] == 2  # both files ride the expired job
 
@@ -274,7 +274,7 @@ def test_list_artifacts_gitea_actions_shape():
         platform=GITEA,
     )
     out = artifacts.list_artifacts(conn, "dev/web")
-    assert out["total"] == 1 and out["totalBytes"] == 2048
+    assert out["returned"] == 1 and out["totalBytes"] == 2048
 
 
 # ── overview ────────────────────────────────────────────────────────────────

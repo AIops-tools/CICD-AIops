@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-import json
 from typing import Annotated
 
 import typer
 
-from cicd_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from cicd_aiops.cli._common import (
+    TargetOption,
+    cli_errors,
+    get_connection,
+    print_result,
+)
 
 rca_app = typer.Typer(
     name="rca",
@@ -31,7 +35,7 @@ def rca_pipelines(
 
     conn, _ = get_connection(target)
     pulled = ops.pull_failed_pipelines(conn, project, limit=limit)
-    console.print_json(json.dumps(ops.pipeline_failure_rca(pulled)))
+    print_result(ops.pipeline_failure_rca(pulled))
 
 
 @rca_app.command("runners")
@@ -42,7 +46,7 @@ def rca_runners(target: TargetOption = None) -> None:
     from cicd_aiops.ops import runners as runner_ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.runner_health_rca(runner_ops.pull_runners(conn))))
+    print_result(ops.runner_health_rca(runner_ops.pull_runners(conn)))
 
 
 @rca_app.command("storage")
@@ -59,9 +63,7 @@ def rca_storage(
 
     conn, _ = get_connection(target)
     projects = project_ops.pull_projects_with_stats(conn)
-    console.print_json(
-        json.dumps(ops.artifact_storage_bloat_analysis(projects, old_artifact_days=old_days))
-    )
+    print_result(ops.artifact_storage_bloat_analysis(projects, old_artifact_days=old_days))
 
 
 @rca_app.command("stale")
@@ -84,15 +86,13 @@ def rca_stale(
     branches = repo_ops.list_branches(conn, project).get("branches", [])
     protections = repo_ops.list_protected_branches(conn, project).get("protections", [])
     detail = project_ops.project_detail(conn, project)
-    console.print_json(
-        json.dumps(
-            ops.stale_work_audit(
-                mrs,
-                branches,
-                protections=protections,
-                default_branch=detail.get("defaultBranch", ""),
-                stale_mr_days=mr_days,
-                stale_branch_days=branch_days,
-            )
+    print_result(
+        ops.stale_work_audit(
+            mrs,
+            branches,
+            protections=protections,
+            default_branch=detail.get("defaultBranch") or "",
+            stale_mr_days=mr_days,
+            stale_branch_days=branch_days,
         )
     )
