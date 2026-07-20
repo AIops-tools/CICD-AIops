@@ -40,8 +40,14 @@ def cli_errors(fn: Callable) -> Callable:
         except (typer.Exit, typer.Abort):
             raise
         except _cli_error_types() as e:
+            from cicd_aiops.platform import UnsupportedResource
+
             message = str(e)
-            if isinstance(e, KeyError):
+            if isinstance(e, UnsupportedResource):
+                # Already a complete teaching message; prefixing it with a
+                # config-key headline sends the reader down the wrong path.
+                message = message.strip('"')
+            elif isinstance(e, KeyError):
                 message = f"Missing required key or environment variable: {message}"
             console.print(f"[red]Error: {message}[/]")
             raise typer.Exit(1) from e

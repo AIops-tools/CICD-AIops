@@ -98,6 +98,17 @@ def _sanitize_obj(obj: Any, depth: int = 0) -> Any:
     return obj
 
 
+class UnsupportedResource(KeyError):  # noqa: N818 — teaching error, reads as a statement
+    """A resource this platform genuinely does not expose.
+
+    Subclasses ``KeyError`` so existing ``except KeyError`` handlers keep
+    working, but is distinguishable — a bare ``KeyError`` here was being
+    reported by the CLI as "Missing required key or environment variable",
+    sending the operator to hunt a config problem that does not exist. The
+    real cause (this platform has no such resource) was buried in the detail.
+    """
+
+
 @dataclass(frozen=True)
 class Platform:
     """A CI/CD server's API shape: auth style + logical-resource path map."""
@@ -130,7 +141,7 @@ class Platform:
             template = self.paths[resource]
         except KeyError as exc:
             available = ", ".join(sorted(self.paths)) or "(none)"
-            raise KeyError(
+            raise UnsupportedResource(
                 f"Resource '{resource}' is not available on platform '{self.name}'. "
                 f"Available resources: {available}."
             ) from exc
