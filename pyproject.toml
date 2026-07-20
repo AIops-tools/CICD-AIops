@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cicd-aiops"
-version = "0.2.1"
+version = "0.3.0"
 description = "Governed AI-ops for self-managed GitLab + Gitea CI/CD: pipelines, jobs, runners, artifacts, repo hygiene, flagship RCA analyses (pipeline failures, runner health, storage bloat, stale work), and governed writes (retry/cancel, pause/resume, artifact deletion, branch protection) with a built-in governance harness (audit, budget, undo, risk tiers)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-authors = [{ name = "wei", email = "zhouwei008@gmail.com" }]
+authors = [{ name = "Wei Zhou", email = "zhouwei008@gmail.com" }]
 dependencies = [
     "httpx>=0.27,<1.0",
     "typer>=0.12,<1.0",
