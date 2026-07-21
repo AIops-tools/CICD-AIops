@@ -13,7 +13,7 @@ from cicd_aiops.cli._common import (
     cli_errors,
     console,
     double_confirm,
-    dry_run_print,
+    dry_run_preview,
     get_connection,
     print_result,
 )
@@ -65,8 +65,14 @@ def runners_pause(
     from mcp_server.tools import writes as gov
 
     if dry_run:
-        dry_run_print(operation="pause_runner", api_call="pause runner",
-                      parameters={"runner": runner})
+        preview = gov.pause_runner(runner=runner, dry_run=True, target=target)
+        would = preview.get("wouldPause", {}) if isinstance(preview, dict) else {}
+        dry_run_preview(
+            preview,
+            operation="pause_runner",
+            api_call=f"PUT {would.get('path', 'pause runner')}",
+            parameters={"runner": runner, "paused": True},
+        )
         return
     double_confirm("pause runner", runner)
     console.print_json(json.dumps(gov.pause_runner(runner=runner, target=target)))
@@ -83,8 +89,14 @@ def runners_resume(
     from mcp_server.tools import writes as gov
 
     if dry_run:
-        dry_run_print(operation="resume_runner", api_call="resume runner",
-                      parameters={"runner": runner})
+        preview = gov.resume_runner(runner=runner, dry_run=True, target=target)
+        would = preview.get("wouldResume", {}) if isinstance(preview, dict) else {}
+        dry_run_preview(
+            preview,
+            operation="resume_runner",
+            api_call=f"PUT {would.get('path', 'resume runner')}",
+            parameters={"runner": runner, "paused": False},
+        )
         return
     double_confirm("resume runner", runner)
     console.print_json(json.dumps(gov.resume_runner(runner=runner, target=target)))

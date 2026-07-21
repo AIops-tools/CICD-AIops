@@ -41,9 +41,6 @@ The wizard asks for:
 4. **Access token** — prompted hidden, stored encrypted, never in
    config.yaml.
 
-It also seeds `~/.cicd-aiops/rules.yaml` with the dual-control tier
-(high-risk writes need a named approver) unless one already exists.
-
 Resulting `~/.cicd-aiops/config.yaml`:
 
 ```yaml
@@ -86,8 +83,19 @@ dud token is reported as unhealthy.
 ```
 
 MCP clients do not source your shell profile — set
-`CICD_AIOPS_MASTER_PASSWORD` (and `CICD_AUDIT_APPROVED_BY` if the agent may
-run high-risk writes) in the `env` block.
+`CICD_AIOPS_MASTER_PASSWORD` in the `env` block.
+
+## Audit-annotation env vars (optional)
+
+The skill does not decide whether a write is permitted — that is the agent's
+judgement or the connecting token's scope. If you want the audit trail to record
+*who* ran a destructive op and *why*, set these; they are recorded on the row,
+never required, and gate nothing:
+
+```bash
+export CICD_AUDIT_APPROVED_BY='you@example.com'
+export CICD_AUDIT_RATIONALE='why this destructive op is justified'
+```
 
 ## Troubleshooting
 
@@ -97,4 +105,4 @@ run high-risk writes) in the `env` block.
 | `Could not reach ...` | check `base_url`, VPN/network path, and that the API is enabled |
 | self-signed cert errors | re-run `init` and answer No to TLS verify (lab only) |
 | `Resource ... not available on platform 'gitea'` | expected: runner admin / pipeline retry / artifact delete are GitLab surfaces in v0.1 |
-| high-risk write denied | set `CICD_AUDIT_APPROVED_BY` + `CICD_AUDIT_RATIONALE`, or edit `rules.yaml` |
+| a write fails with `403` | the token lacks the write scope — reissue with write access (or keep it read-only by design) |

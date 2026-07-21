@@ -115,7 +115,7 @@ mcp = FastMCP(
         "retry_pipeline / cancel_pipeline (priorState recorded), pause_runner "
         "/ resume_runner (a reversible undo pair), update_branch_protection "
         "(undo replays the prior settings), plus delete_artifacts at risk=high "
-        "with a dry_run preview and an approver. Every tool runs through the "
+        "with a dry_run preview. Every tool runs through the "
         "cicd-aiops governance harness (audit / budget / risk-tier / undo). "
         "The same tools work on both servers: a per-target 'platform' field "
         "selects the API shape; surfaces one platform lacks raise a teaching "

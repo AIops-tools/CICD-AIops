@@ -13,7 +13,7 @@ from cicd_aiops.cli._common import (
     cli_errors,
     console,
     double_confirm,
-    dry_run_print,
+    dry_run_preview,
     get_connection,
     print_result,
 )
@@ -57,8 +57,22 @@ def artifacts_delete(
 
     scope = f"older than {older_than_days:g} days" if older_than_days else "ALL"
     if dry_run:
-        dry_run_print(operation="delete_artifacts", api_call="delete artifacts",
-                      parameters={"project": project, "scope": scope})
+        preview = gov.delete_artifacts(
+            project=project, older_than_days=older_than_days, dry_run=True, target=target
+        )
+        would = preview.get("wouldDelete", {}) if isinstance(preview, dict) else {}
+        dry_run_preview(
+            preview,
+            operation="delete_artifacts",
+            api_call=f"DELETE {would.get('path', 'artifacts')}",
+            parameters={
+                "project": project,
+                "scope": scope,
+                "currentCount": would.get("currentCount"),
+                "currentBytes": would.get("currentBytes"),
+                "expiredButKept": would.get("expiredButKept"),
+            },
+        )
         return
     double_confirm(f"delete artifacts ({scope})", project)
     console.print_json(

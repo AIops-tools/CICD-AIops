@@ -28,11 +28,15 @@ zhouwei008@gmail.com. Please do not open public issues for exploitable bugs.
 ## Blast-radius controls
 
 - Every MCP tool and every CLI write runs through the `@governed_tool`
-  harness: audit log (`~/.cicd-aiops/audit.db`), call/time budgets, a runaway
-  breaker, graduated risk tiers, and undo-token recording.
-- Secure by default: with no `rules.yaml`, high-risk writes
-  (`delete_artifacts`) are denied unless `CICD_AUDIT_APPROVED_BY` names a
-  human approver.
+  harness: audit log (`~/.cicd-aiops/audit.db`) over MCP **and** the CLI alike,
+  a runaway safety breaker, and undo-token recording. There is no unaudited
+  entry point.
+- **The skill does not decide read vs write.** There is no read-only switch,
+  policy file, or approval gate. Whether a write is permitted is the agent's
+  judgement or the connecting account's permissions (a GitLab/Gitea token with
+  limited scope — the write then fails at the server). The declared `risk_level`
+  is a descriptive label on the audit row, not a gate; `CICD_AUDIT_APPROVED_BY`
+  / `CICD_AUDIT_RATIONALE` are optional audit annotations, never required.
 - Every write supports `dry_run`; the CLI double-confirms destructive
   operations.
 

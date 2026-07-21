@@ -73,7 +73,7 @@ cicd-aiops mcp                      # start the MCP server (stdio)
 | `CICD_AIOPS_HOME` | relocate config/audit/undo/secrets (default `~/.cicd-aiops`) |
 | `CICD_AIOPS_CONFIG` | explicit config.yaml path for the MCP server |
 | `CICD_AIOPS_MASTER_PASSWORD` | unlock secrets.enc non-interactively |
-| `CICD_AUDIT_APPROVED_BY` / `CICD_AUDIT_RATIONALE` | approver gate for high-risk writes |
+| `CICD_AUDIT_APPROVED_BY` / `CICD_AUDIT_RATIONALE` | optional audit annotations (who/why) — recorded, never required |
 | `CICD_MAX_TOOL_CALLS` / `CICD_MAX_TOOL_SECONDS` | budget caps |
 | `CICD_RUNAWAY_MAX` / `CICD_RUNAWAY_WINDOW_SEC` | runaway breaker |
 | `CICD_<TARGET>_SECRET` | legacy plaintext token fallback (deprecated) |

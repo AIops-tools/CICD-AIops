@@ -1,7 +1,7 @@
 """Governed CI/CD-write MCP tools (the only state-changing tools).
 
-Every tool is wrapped with the governance harness (audit + graduated approval
-tier) and takes a ``dry_run`` preview. Reversible writes pass an ``undo=``
+Every tool is wrapped with the governance harness (audit + risk tier) and takes
+a ``dry_run`` preview. Reversible writes pass an ``undo=``
 callback that turns the fetched before-state into an inverse descriptor the
 harness records; irreversible ones (pipeline retry/cancel, artifact deletion)
 record priorState only.
@@ -16,6 +16,25 @@ from typing import Any, Optional
 from cicd_aiops.governance import governed_tool
 from cicd_aiops.ops import writes as ops
 from mcp_server._shared import _get_connection, mcp, tool_errors
+
+
+def _write_path(conn: Any, resource: str, **fmt: Any) -> str:
+    """Resolve the REST path a write will call — the preview's platform guard.
+
+    A ``dry_run`` returns before the ops layer runs, so without this the preview
+    never touches the platform registry and happily describes a write that the
+    real call is about to reject with ``UnsupportedResource`` (runner
+    administration, pipeline retry/cancel and bulk artifact deletion exist on
+    GitLab but not on Gitea). Resolving the path here makes the preview run the
+    same registry lookup the write does, so an unsupported surface refuses at
+    preview time instead of promising an operation that cannot happen.
+
+    Called with no ``fmt`` it returns the unformatted template — still a real
+    registry lookup, still raising for an unmapped resource — which is what a
+    per-job path wants, since which jobs are hit is data-dependent.
+    """
+    return conn.platform.path(resource, **fmt)
+
 
 # ── undo descriptors (built from the fetched before-state) ──────────────────
 
@@ -104,7 +123,14 @@ def retry_pipeline(
     """
     conn = _get_connection(target)
     if dry_run:
-        return {"dryRun": True, "wouldRetry": {"project": project, "pipeline": pipeline}}
+        return {
+            "dryRun": True,
+            "wouldRetry": {
+                "project": project,
+                "pipeline": pipeline,
+                "path": _write_path(conn, "pipeline_retry", project=project, pipeline=pipeline),
+            },
+        }
     return ops.retry_pipeline(conn, project, pipeline)
 
 
@@ -131,7 +157,14 @@ def cancel_pipeline(
     """
     conn = _get_connection(target)
     if dry_run:
-        return {"dryRun": True, "wouldCancel": {"project": project, "pipeline": pipeline}}
+        return {
+            "dryRun": True,
+            "wouldCancel": {
+                "project": project,
+                "pipeline": pipeline,
+                "path": _write_path(conn, "pipeline_cancel", project=project, pipeline=pipeline),
+            },
+        }
     return ops.cancel_pipeline(conn, project, pipeline)
 
 
@@ -159,7 +192,13 @@ def pause_runner(
     """
     conn = _get_connection(target)
     if dry_run:
-        return {"dryRun": True, "wouldPause": {"runner": runner}}
+        return {
+            "dryRun": True,
+            "wouldPause": {
+                "runner": runner,
+                "path": _write_path(conn, "runner_update", runner=runner),
+            },
+        }
     return ops.pause_runner(conn, runner)
 
 
@@ -183,7 +222,13 @@ def resume_runner(
     """
     conn = _get_connection(target)
     if dry_run:
-        return {"dryRun": True, "wouldResume": {"runner": runner}}
+        return {
+            "dryRun": True,
+            "wouldResume": {
+                "runner": runner,
+                "path": _write_path(conn, "runner_update", runner=runner),
+            },
+        }
     return ops.resume_runner(conn, runner)
 
 
@@ -202,9 +247,8 @@ def delete_artifacts(
     """[WRITE][risk=high] Delete a project's artifacts (all, or older than N days).
 
     IRREVERSIBLE — reads the artifact inventory first so priorState records the
-    file count and bytes being destroyed; no undo. Requires an approver
-    (CICD_AUDIT_APPROVED_BY) under the graduated-autonomy policy. Pass
-    dry_run=True to preview (reports what would be reclaimed without deleting).
+    file count and bytes being destroyed; no undo. Pass dry_run=True to preview
+    (reports what would be reclaimed without deleting).
 
     Args:
         project: Project id or full path.
@@ -217,12 +261,22 @@ def delete_artifacts(
     if dry_run:
         from cicd_aiops.ops import artifacts as artifact_ops
 
+        # Resolve the delete path FIRST, before the inventory read: on a
+        # platform with no artifact-deletion surface this raises the same
+        # teaching error the real write would, so the preview refuses rather
+        # than spending a scan to describe a deletion that cannot happen. The
+        # per-job path stays a template — which jobs are hit is data-dependent.
+        if older_than_days > 0:
+            path = _write_path(conn, "job_artifacts_delete")
+        else:
+            path = _write_path(conn, "artifacts_delete", project=project)
         inventory = artifact_ops.list_artifacts(conn, project)
         return {
             "dryRun": True,
             "wouldDelete": {
                 "project": project,
                 "olderThanDays": older_than_days,
+                "path": path,
                 "currentCount": inventory.get("total"),
                 "currentBytes": inventory.get("totalBytes"),
                 "expiredButKept": inventory.get("expiredButKept"),

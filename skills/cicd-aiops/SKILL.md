@@ -22,7 +22,7 @@ compatibility: >
   Standalone, self-governed CI/CD operations across self-managed GitLab (REST API v4 /api/v4/..., access token via PRIVATE-TOKEN header) and self-hosted Gitea (API v1 /api/v1/..., access token via "Authorization: token"). Each target in the config names its own platform, and a name-keyed platform registry selects the API shape, so the same tools work on both and one config can span a mixed estate; surfaces one platform lacks (e.g. runner administration on Gitea) raise a teaching error listing what is available. The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency.
   All write operations are audited to a local SQLite DB under ~/.cicd-aiops/ (relocatable via CICD_AIOPS_HOME).
   Credentials: the GitLab personal/project access token or Gitea access token is stored ENCRYPTED in ~/.cicd-aiops/secrets.enc (Fernet/AES-128 + scrypt-derived key) — never plaintext on disk. Run 'cicd-aiops init' to onboard (it asks for the platform and base URL), or 'cicd-aiops secret set <target>' to add one. The store is unlocked by a master password from CICD_AIOPS_MASTER_PASSWORD (non-interactive/MCP/CI) or an interactive prompt (CLI on a TTY). A legacy plaintext env var CICD_<TARGET_NAME_UPPER>_SECRET is still honoured as a fallback with a deprecation warning (migrate with 'cicd-aiops secret migrate'). The token is presented as a PRIVATE-TOKEN header (GitLab) or an Authorization token header (Gitea) at request time and held only in memory; secrets are never logged or echoed.
-  State-changing operations pass through the @governed_tool decorator (pre-check + budget guard + audit + risk-tier gate). delete_artifacts is risk=high with dry_run + an approver gate and is irreversible (priorState records the destroyed count/bytes). Reversible writes (pause_runner/resume_runner as an undo pair; update_branch_protection replaying prior settings) capture the real fetched before-state and record an inverse undo descriptor; retry_pipeline/cancel_pipeline record priorState (the pipeline's prior status) only.
+  State-changing operations pass through the @governed_tool decorator (pre-check + budget guard + audit + risk-tier label). delete_artifacts is risk=high with dry_run + double confirmation and is irreversible (priorState records the destroyed count/bytes). Reversible writes (pause_runner/resume_runner as an undo pair; update_branch_protection replaying prior settings) capture the real fetched before-state and record an inverse undo descriptor; retry_pipeline/cancel_pipeline record priorState (the pipeline's prior status) only.
   Webhooks: none — no outbound network calls beyond the configured GitLab / Gitea REST API.
   SSL: verify_ssl defaults to ON; the init wizard asks before disabling it for self-signed lab certs.
   Transitive dependencies: httpx (HTTP client) and the MCP SDK. No post-install scripts or background services.
@@ -36,11 +36,11 @@ compatibility: >
 Governed CI/CD operations — **28 MCP tools** across **self-managed GitLab** (REST
 `/api/v4/...`) and **self-hosted Gitea** (API `/api/v1/...`), every one wrapped with
 the bundled `@governed_tool` harness: a local unified audit log under
-`~/.cicd-aiops/`, policy engine, token/runaway budget guard, undo-token recording,
-and graduated-autonomy risk tiers. A per-target `platform` field selects the API
-shape, so the same tools work on both servers and one config can span a mixed
-estate. The access token is stored **encrypted** (`~/.cicd-aiops/secrets.enc`,
-Fernet + scrypt) — never plaintext on disk.
+`~/.cicd-aiops/`, token/runaway budget guard, undo-token recording, and
+descriptive risk tiers. A per-target `platform` field selects the API shape, so
+the same tools work on both servers and one config can span a mixed estate. The
+access token is stored **encrypted** (`~/.cicd-aiops/secrets.enc`, Fernet +
+scrypt) — never plaintext on disk.
 
 > **Standalone**: the governance harness is bundled in the package
 > (`cicd_aiops.governance`) — no external skill-family dependency. Both
@@ -92,7 +92,7 @@ cicd-aiops doctor     # version endpoint + token-scope probe per target
   unprotected default branch, force-push gaps
 - Safely act: `retry_pipeline` / `cancel_pipeline`, `pause_runner` /
   `resume_runner` (undo pair), `update_branch_protection` (undo replays prior
-  settings), `delete_artifacts` (risk=high, dry-run + approver)
+  settings), `delete_artifacts` (risk=high, dry-run + double confirm)
 
 **Do NOT use when** the target is not a GitLab/Gitea CI/CD server — route
 hypervisor, storage, backup, database, network, or OT/industrial work to the
@@ -172,10 +172,10 @@ raises a teaching error here.
    project you expect.
 4. `cicd-aiops artifacts delete dev/api --older-than-days 30 --dry-run` →
    shows the scope, deletes nothing.
-5. Re-run without `--dry-run`: double confirm, **high** risk, requires
-   `CICD_AUDIT_APPROVED_BY` + `CICD_AUDIT_RATIONALE`. This is **irreversible** —
-   priorState records the destroyed count and bytes for the audit trail, but
-   there is no undo.
+5. Re-run without `--dry-run`: double confirm, **high** risk. Optionally set
+   `CICD_AUDIT_APPROVED_BY` + `CICD_AUDIT_RATIONALE` to annotate who/why on the
+   audit row. This is **irreversible** — priorState records the destroyed count
+   and bytes for the audit trail, but there is no undo.
 6. `cicd-aiops rca storage` again to confirm the reclaimed bytes landed.
 
 **Failure branch**: never run `artifacts delete` with `--older-than-days 0` as
@@ -208,23 +208,23 @@ fleet-wide to unblock one job.
 
 ## Governance & Safety
 
-- **Secure by default**: with no `~/.cicd-aiops/rules.yaml`, high/critical
-  operations are denied unless `CICD_AUDIT_APPROVED_BY` names an approver (set
-  `CICD_AUDIT_RATIONALE` too). `cicd-aiops init` seeds a starter rules.yaml; an
-  operator-authored rules file is honoured as-is.
-- Every tool is audited to `~/.cicd-aiops/audit.db` (relocatable via
-  `CICD_AIOPS_HOME`).
-- Writes support `--dry-run` and double confirmation at the CLI.
-  `delete_artifacts` is irreversible (priorState records the destroyed
-  count/bytes; audit only).
-- Reversible writes capture the real fetched before-state and record an inverse
-  descriptor (pause↔resume, protection→prior settings).
+The skill delivers reads and writes and records them; it does **not** decide
+whether a write is permitted. That is your agent's judgement, or the permission
+of the token you connect it with (a GitLab/Gitea access token without write
+scope — writes then fail at the server). There is no read-only switch, policy
+file, or approval gate.
+
+- **Audit is the guarantee, and it is not bypassable.** Every operation — MCP and CLI alike — is logged to `~/.cicd-aiops/audit.db` (relocatable via `CICD_AIOPS_HOME`): params, result, status, duration, and the risk tier. The CLI writes the same row the MCP path does.
+- `CICD_AUDIT_APPROVED_BY` / `CICD_AUDIT_RATIONALE` are optional annotations recorded on the audit row (who/why); they are never required and never block.
+- **Runaway guard** — a safety backstop, not authorization: the same call looped in a tight window trips a circuit breaker. Disable with `CICD_RUNAWAY_MAX=0`.
+- Destructive writes support `--dry-run` / `dry_run=True` and double confirmation at the CLI. `delete_artifacts` is irreversible (priorState records the destroyed count/bytes; audit only).
+- Reversible writes fetch the real before-state and record an inverse descriptor (pause_runner↔resume_runner, update_branch_protection→prior settings); irreversible ops (retry_pipeline, cancel_pipeline, delete_artifacts) record only the before-state.
 
 ## References
 
 - `references/capabilities.md` — full tool + platform + API-path reference
 - `references/cli-reference.md` — CLI command reference
 - `references/setup-guide.md` — onboarding, credentials, and connectivity
-- `references/agent-guardrails.md` — read-only mode (`CICD_READ_ONLY=1`), which
-  guardrails the harness enforces, the GitLab-only vs Gitea platform asymmetry,
-  and a ready-made system prompt for smaller / local models
+- `references/agent-guardrails.md` — which guardrails the harness enforces, the
+  GitLab-only vs Gitea platform asymmetry, and a ready-made system prompt for
+  smaller / local models

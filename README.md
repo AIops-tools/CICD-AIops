@@ -22,44 +22,28 @@ directly against your server, with credentials encrypted at rest.
 > This tool ends at the CI/CD server's API (pipelines, runners, artifacts,
 > repo hygiene).
 
-## Security: read-only mode
+## What this tool does, and does not, decide
 
-This tool is meant to be handed to an AI agent, so its safety story is enforced
-by the server rather than requested in a prompt:
+It delivers CI/CD operations — reads and writes — accurately and efficiently, and
+records every one of them. It does **not** decide whether a write is allowed to
+happen. That is the agent's judgement, or the permission of the token you connect
+it with: give it a GitLab/Gitea access token without write scope and the writes
+fail at the server — the place that actually owns the permission.
 
-```bash
-export CICD_READ_ONLY=1
-```
+So there is no read-only switch, no policy file, no approval gate to configure.
+The one thing the tool guarantees is that nothing is silent: **every call, over
+MCP and over the CLI alike, lands an audit row** in `~/.cicd-aiops/audit.db`,
+and destructive writes still capture their before-state and record an inverse
+where one exists.
 
-With that set, the **7 write tools are never registered**. An MCP client
-lists **21 tools instead of 28** — the writes are not hidden, not
-gated behind a flag, and not merely refused when called. They are absent from
-the session. A model cannot invoke a tool it was never offered, and cannot be
-argued into one.
-
-That distinction is the whole point. A tool that exists but refuses still invites
-retry loops and "I'll describe the call instead" behaviour from smaller models,
-and it leaves a reviewer trusting a promise. An absent tool is a fact you can
-check: connect, list the tools, and see that the writes are not there.
-
-Enforcement is two layers deep, so the switch cannot be sidestepped by changing
-entry point:
-
-| Layer | What it does | Covers |
-|---|---|---|
-| `@governed_tool` harness | refuses every non-read operation outright | MCP, CLI, and in-process callers |
-| MCP registration | write tools are removed from `list_tools()` | anything speaking MCP |
-
-Read operations are unaffected, and every call is still audited to
-`~/.cicd-aiops/audit.db`.
-
-> The read/write split is derived from each tool's declared `risk_level`, and a
-> test asserts that this never disagrees with the `[READ]`/`[WRITE]` tag in the
-> tool's own documentation — so a write can't quietly present itself as a read.
+> Each tool declares a `risk_level`, kept in agreement with its `[READ]`/`[WRITE]`
+> documentation tag by a test, and carried into the audit row as a descriptive
+> tier — so a reviewer can see at a glance that a row was a high-risk delete. It
+> is a label, not a gate.
 
 Running a smaller / local model? See
 [agent-guardrails.md](skills/cicd-aiops/references/agent-guardrails.md) — it lists
-the guardrails this tool now enforces for you (so you don't spend prompt budget
+the guardrails this tool enforces for you (so you don't spend prompt budget
 restating them) and gives a ready-made system prompt for what's left.
 
 ## Quick start
@@ -129,22 +113,24 @@ flag carries its numbers.
 ## Governance (built in, always on)
 
 Every MCP tool and every CLI write runs through the vendored harness in
-`cicd_aiops/governance/`:
+`cicd_aiops/governance/`. It records; it does not authorize (see above).
 
-- **Audit** — every call (including denials and errors) lands in
-  `~/.cicd-aiops/audit.db` with params, status, risk level, and approver.
-- **Budget** — call/time budgets and a runaway breaker
-  (`CICD_MAX_TOOL_CALLS`, `CICD_MAX_TOOL_SECONDS`, `CICD_RUNAWAY_MAX`).
-- **Risk tiers, secure by default** — reads are `low`; mutating writes are
-  `medium`; `delete_artifacts` is `high`. With no `rules.yaml`, high-risk
-  writes are **denied unless a named approver** is set
-  (`CICD_AUDIT_APPROVED_BY`, plus `CICD_AUDIT_RATIONALE`). `init` seeds a
-  starter `rules.yaml` with that dual-control tier spelled out.
+- **Audit** — every call (params, result, status, duration, risk tier, and any
+  operator-supplied approver/rationale) is logged to `~/.cicd-aiops/audit.db`
+  (relocatable via `CICD_AIOPS_HOME`). The CLI writes the same row the MCP path
+  does — there is no unaudited entry point.
+- **Runaway guard** — a safety backstop, not an authorization gate: the same
+  call hammered in a tight loop trips a circuit breaker so a stuck agent can't
+  burn unbounded calls/time. Disable with `CICD_RUNAWAY_MAX=0`; optional hard
+  ceilings via `CICD_MAX_TOOL_CALLS` / `CICD_MAX_TOOL_SECONDS`.
 - **Undo** — reversible writes record a replayable inverse in
   `~/.cicd-aiops/undo.db`, built from the *fetched* before-state:
   `pause_runner` ⇄ `resume_runner`, and `update_branch_protection` replays the
   prior settings. Irreversible writes (`retry_pipeline`, `cancel_pipeline`,
   `delete_artifacts`) record `priorState` (status / bytes+count) instead.
+- **Risk tier** — a descriptive label on the audit row derived from
+  `risk_level` (reads `low`; mutating writes `medium`; `delete_artifacts`
+  `high`); it gates nothing.
 - **Dry-run everywhere** — every write takes `dry_run=True` (MCP) /
   `--dry-run` (CLI) and previews without calling the server.
 - **Sanitize** — all server-returned text is folded through an
@@ -180,9 +166,9 @@ from a master password via scrypt. Never plaintext on disk. Set
 
 > **Env-block caveat**: MCP clients launch the server with a *minimal*
 > environment — your shell profile is not sourced. Anything the server needs
-> (`CICD_AIOPS_MASTER_PASSWORD`, `CICD_AIOPS_HOME`, `CICD_AUDIT_APPROVED_BY`
-> for high-risk writes) must be set in the `env` block above, not in
-> `~/.zshrc`.
+> (`CICD_AIOPS_MASTER_PASSWORD`, `CICD_AIOPS_HOME`, and any optional
+> `CICD_AUDIT_APPROVED_BY` audit annotation) must be set in the `env` block
+> above, not in `~/.zshrc`.
 
 Alternatively: `cicd-aiops mcp` (same server, CLI entry point).
 

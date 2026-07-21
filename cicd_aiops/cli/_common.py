@@ -24,10 +24,18 @@ DryRunOption = Annotated[
 
 
 def _cli_error_types() -> tuple[type[BaseException], ...]:
-    """Exceptions translated to a one-line teaching error instead of a traceback."""
-    from cicd_aiops.connection import CicdApiError
+    """Exceptions translated to a one-line teaching error instead of a traceback.
 
-    return (CicdApiError, KeyError, OSError, ValueError)
+    ``PolicyDenied`` belongs here even though it is not a ValueError: it is
+    raised by ``@governed_tool``, which sits OUTSIDE ``@tool_errors``, so it is
+    never flattened into an ``{"error": ...}`` dict — it would propagate all the
+    way to the CLI. Catching it keeps a stray governance exception from surfacing
+    as a bare traceback instead of a one-line message.
+    """
+    from cicd_aiops.connection import CicdApiError
+    from cicd_aiops.governance import PolicyDenied
+
+    return (CicdApiError, KeyError, OSError, ValueError, PolicyDenied)
 
 
 def cli_errors(fn: Callable) -> Callable:
@@ -101,6 +109,51 @@ def dry_run_print(*, operation: str, api_call: str, parameters: dict | None = No
     for k, v in (parameters or {}).items():
         console.print(f"[magenta]  Param:     {k} = {v}[/]")
     console.print("[magenta]  Run without --dry-run to execute.[/]\n")
+
+
+def _teaching_message(message: str) -> str:
+    """Undo ``str(KeyError)``'s repr quoting on an error flattened into a dict.
+
+    ``tool_errors`` turns the exception into ``{"error": str(exc)}``, and
+    ``str()`` of a ``KeyError`` — which is what ``UnsupportedResource`` is —
+    wraps the message in repr quotes. :func:`cli_errors` already strips them on
+    the exception path; the flattened-dict path has to do the same, or the one
+    error in this tool that fully explains itself arrives wearing stray
+    quotation marks.
+    """
+    if len(message) > 1 and message.startswith('"') and message.endswith('"'):
+        return message[1:-1]
+    return message
+
+
+def dry_run_preview(
+    preview: Any, *, operation: str, api_call: str, parameters: dict | None = None
+) -> None:
+    """Render a GOVERNED dry-run result as the human-readable DRY-RUN banner.
+
+    ``preview`` must come from calling the governed twin with ``dry_run=True``,
+    so every guard that twin carries has already run against the real target
+    and the same audit row lands as for a real call — the CLI silently not
+    auditing previews was the outlier, since MCP previews have always been
+    audited.
+
+    A refusal arrives as ``{"error": ...}`` (``tool_errors`` flattens the
+    exception into the dict) and is surfaced exactly like a refused real write:
+    the teaching message in red, exit code 1. A green banner for a call the
+    write is about to reject is the preview being *wrong*, not merely
+    incomplete — and a caller that reads "here is what would happen" and then a
+    refusal treats the refusal as transient and retries.
+
+    Only the *serialization* stays CLI-shaped: the reader is a human, so the
+    returned dict is rendered into the existing banner rather than dumped as
+    JSON.
+
+    Invariant: **a dry_run MAY read; it must never write.**
+    """
+    if isinstance(preview, dict) and preview.get("error"):
+        console.print(f"[red]Error: {_teaching_message(str(preview['error']))}[/]")
+        raise typer.Exit(1)
+    dry_run_print(operation=operation, api_call=api_call, parameters=parameters)
 
 
 def double_confirm(action: str, resource: str) -> None:

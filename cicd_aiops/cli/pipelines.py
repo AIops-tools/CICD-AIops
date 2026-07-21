@@ -13,7 +13,7 @@ from cicd_aiops.cli._common import (
     cli_errors,
     console,
     double_confirm,
-    dry_run_print,
+    dry_run_preview,
     get_connection,
     print_result,
 )
@@ -100,8 +100,16 @@ def pipelines_retry(
     from mcp_server.tools import writes as gov
 
     if dry_run:
-        dry_run_print(operation="retry_pipeline", api_call="retry pipeline",
-                      parameters={"project": project, "pipeline": pipeline})
+        preview = gov.retry_pipeline(
+            project=project, pipeline=pipeline, dry_run=True, target=target
+        )
+        would = preview.get("wouldRetry", {}) if isinstance(preview, dict) else {}
+        dry_run_preview(
+            preview,
+            operation="retry_pipeline",
+            api_call=f"POST {would.get('path', 'retry pipeline')}",
+            parameters={"project": project, "pipeline": pipeline},
+        )
         return
     double_confirm("retry pipeline", f"{project}#{pipeline}")
     console.print_json(
@@ -121,8 +129,16 @@ def pipelines_cancel(
     from mcp_server.tools import writes as gov
 
     if dry_run:
-        dry_run_print(operation="cancel_pipeline", api_call="cancel pipeline",
-                      parameters={"project": project, "pipeline": pipeline})
+        preview = gov.cancel_pipeline(
+            project=project, pipeline=pipeline, dry_run=True, target=target
+        )
+        would = preview.get("wouldCancel", {}) if isinstance(preview, dict) else {}
+        dry_run_preview(
+            preview,
+            operation="cancel_pipeline",
+            api_call=f"POST {would.get('path', 'cancel pipeline')}",
+            parameters={"project": project, "pipeline": pipeline},
+        )
         return
     double_confirm("cancel pipeline", f"{project}#{pipeline}")
     console.print_json(

@@ -61,7 +61,7 @@ trace.
 | `cancel_pipeline` | medium | pipeline status | none (irreversible) |
 | `pause_runner` | medium | runner `paused` flag | `resume_runner` (skipped if it was already paused) |
 | `resume_runner` | medium | runner `paused` flag | `pause_runner` (skipped if it was not paused) |
-| `delete_artifacts` | **high** | artifact count + bytes destroyed | none (irreversible); approver required |
+| `delete_artifacts` | **high** | artifact count + bytes destroyed | none (irreversible) |
 | `update_branch_protection` | medium | prior protection settings (or "unprotected") | replays this tool with the prior settings |
 
 `delete_artifacts(older_than_days=N)` deletes per-job only artifacts created
