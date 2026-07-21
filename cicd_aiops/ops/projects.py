@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cicd_aiops.ops._util import as_obj, listing, num, opt, page_limit, pick, s
+from cicd_aiops.ops._util import as_int, as_obj, listing, opt, page_limit, pick, s
 from cicd_aiops.platform import GITLAB
 
 _MAX_LIST = 100
@@ -28,17 +28,19 @@ def _norm_project(r: dict) -> dict:
     stats = as_obj(r.get("statistics"))
     return {
         "id": s(pick(r, "id")),
+        "name": opt(pick(r, "name")),
         "path": s(pick(r, "path_with_namespace", "full_name", "path")),
         "defaultBranch": opt(pick(r, "default_branch")),
         "archived": bool(pick(r, "archived", default=False)),
         "lastActivity": opt(pick(r, "last_activity_at", "updated_at")),
-        "repoBytes": num(
-            pick(stats, "repository_size", default=num(r.get("size")) * 1024)
+        # Byte counts are integers — as_int, not num (which printed 3870.0 bytes).
+        "repoBytes": as_int(
+            pick(stats, "repository_size", default=as_int(r.get("size")) * 1024)
         ),
         "artifactsBytes": (
-            num(stats["job_artifacts_size"]) if "job_artifacts_size" in stats else None
+            as_int(stats["job_artifacts_size"]) if "job_artifacts_size" in stats else None
         ),
-        "storageBytes": num(stats["storage_size"]) if "storage_size" in stats else None,
+        "storageBytes": as_int(stats["storage_size"]) if "storage_size" in stats else None,
     }
 
 

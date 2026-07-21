@@ -1,29 +1,12 @@
-# Release notes — cicd-aiops 0.4.0
+# Release notes — cicd-aiops 0.5.0
 
-Previous release: 0.3.0.
+Previous release: 0.4.0.
 
-## BREAKING — the authorization layer is removed
+## Live-verified against real GitLab CE 19.2
 
-This tool no longer decides whether a write is permitted. Read-only mode
-(`<PREFIX>_READ_ONLY`), the graduated-approval / approver gate, and the
-`rules.yaml` deny engine are **all gone**. Whether an operation runs is the
-agent's judgement, or the permission of the account you connect it with — point
-it at a read-only credential and the write fails at the server, the place that
-actually owns the permission.
+cicd's GitLab branch was pointed at a real current GitLab for the first time. Reads, the flagship RCA, a governed write (audited, real effect, undo reverted on the server), and the CLI audit path all checked out — and it surfaced the two `list_projects` field bugs fixed below.
 
-What the tool guarantees instead is that **nothing is silent**: every operation,
-over MCP **and** the CLI alike, lands a row in the audit log — there is no
-unaudited entry point. Destructive writes still capture their before-state and
-record an undo token where a clean inverse exists.
 
-- If you set `<PREFIX>_READ_ONLY=1`, it now has **no effect** and the MCP server
-  logs a warning at startup. Restrict writes via the connecting account instead.
-- `<PREFIX>_AUDIT_APPROVED_BY` / `<PREFIX>_AUDIT_RATIONALE` still work, but are now
-  **optional audit annotations** — recorded on the row when set, never required.
-- The declared `risk_level` is carried into the audit row as a descriptive tier
-  (a label, not a gate).
+### In this tool
 
-The governance harness is now: **audit (MCP+CLI, unbypassable) · runaway/budget
-safety guard · undo recording · output sanitize**. `policy.py` is a small
-risk-tier classifier; `governance/readonly.py` is deleted.
-
+- **Fixes two field bugs found live against real GitLab CE 19.2.** `list_projects` now surfaces each project's `name` (it only mapped the path before), and reports byte counts (`repoBytes` / `artifactsBytes` / `storageBytes`) as **integers** — GitLab's `repository_size` was being rendered as a float (`3870.0` bytes).

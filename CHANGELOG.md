@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.0 — 2026-07-21
+
+### Fixed
+- `list_projects` surfaces each project's `name` and reports byte counts as integers (was float) — found live against real GitLab CE 19.2.
+
+See RELEASE_NOTES.md for detail.
+
+
 ## v0.4.0 — 2026-07-21
 
 ### Changed (BREAKING)

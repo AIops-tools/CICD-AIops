@@ -57,9 +57,13 @@ def test_current_user_scope_probe_both_shapes():
 
 @pytest.mark.unit
 def test_list_projects_gitlab_statistics():
+    # Model GitLab's REAL project shape: it has a `name` (display name) distinct
+    # from `path`/`path_with_namespace`, and integer byte statistics. A live
+    # GitLab 19.2 exposed both gaps the earlier fixture (no `name`) could not.
     conn = _Conn({
         _p(GITLAB, "projects"): [
-            {"id": 1, "path_with_namespace": "dev/api", "default_branch": "main",
+            {"id": 1, "name": "api", "path": "api", "path_with_namespace": "dev/api",
+             "default_branch": "main",
              "statistics": {"repository_size": 1000, "job_artifacts_size": 500,
                             "storage_size": 1500}},
         ]
@@ -67,22 +71,29 @@ def test_list_projects_gitlab_statistics():
     out = projects.list_projects(conn)
     assert out["returned"] == 1
     p = out["projects"][0]
+    assert p["name"] == "api", "the human display name must be surfaced, not just the path"
     assert p["path"] == "dev/api"
     assert p["repoBytes"] == 1000 and p["artifactsBytes"] == 500
+    # Byte counts are integers — equality passes for 1000.0 too, so assert the type.
+    assert isinstance(p["repoBytes"], int) and isinstance(p["artifactsBytes"], int)
+    assert isinstance(p["storageBytes"], int)
 
 
 @pytest.mark.unit
 def test_list_projects_gitea_search_shape():
     conn = _Conn(
         {_p(GITEA, "projects"): {"data": [
-            {"id": 7, "full_name": "dev/web", "default_branch": "main", "size": 2},
+            {"id": 7, "name": "web", "full_name": "dev/web", "default_branch": "main",
+             "size": 2},
         ]}},
         platform=GITEA,
     )
     out = projects.list_projects(conn)
     assert out["returned"] == 1
-    # Gitea reports size in KiB → bytes
-    assert out["projects"][0]["repoBytes"] == 2048
+    p = out["projects"][0]
+    assert p["name"] == "web"
+    # Gitea reports size in KiB → bytes, as an integer
+    assert p["repoBytes"] == 2048 and isinstance(p["repoBytes"], int)
 
 
 # ── pipelines ───────────────────────────────────────────────────────────────

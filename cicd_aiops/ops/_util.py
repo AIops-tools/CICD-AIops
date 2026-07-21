@@ -99,11 +99,29 @@ def to_bool(value: Any) -> bool:
 
 
 def num(value: Any) -> float:
-    """Coerce a numeric cell to float; 0.0 when absent/non-numeric."""
+    """Coerce a genuinely fractional cell to float; 0.0 when absent/non-numeric.
+
+    For integer quantities — byte counts, counts, whole seconds — use
+    :func:`as_int`, which keeps them integers. GitLab's ``repository_size`` /
+    ``storage_size`` are integer byte counts; routing them through ``num`` printed
+    ``3870.0`` bytes, arithmetically right but semantically wrong.
+    """
     try:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def as_int(value: Any) -> int:
+    """Coerce an integer quantity (bytes/counts/whole seconds) to int; 0 if absent.
+
+    A count or byte total cannot be fractional. Accepts ``"3870"`` and ``3870.0``.
+    Keep :func:`num` for genuine ratios/rates.
+    """
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 def parse_ts(value: Any) -> datetime | None:
