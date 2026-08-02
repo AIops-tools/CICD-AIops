@@ -118,6 +118,10 @@ def as_int(value: Any) -> int:
     A count or byte total cannot be fractional. Accepts ``"3870"`` and ``3870.0``.
     Keep :func:`num` for genuine ratios/rates.
     """
+    if isinstance(value, bool):  # bool subclasses int; not a quantity
+        return 0
+    if isinstance(value, int):
+        return value  # already exact — never round-trip through float64
     try:
         return int(float(value))
     except (TypeError, ValueError):
