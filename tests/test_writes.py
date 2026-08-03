@@ -118,6 +118,10 @@ def test_delete_artifacts_bulk_captures_inventory(monkeypatch):
     )
     out = ops.delete_artifacts(conn, "1")
     assert out["priorState"] == {"count": 2, "bytes": 300, "complete": True}
+    # bytes is a byte count — an integer quantity, not a float (bug class #2).
+    # Equality cannot catch it (300 == 300.0); assert the type explicitly.
+    total = out["priorState"]["bytes"]
+    assert isinstance(total, int) and not isinstance(total, bool)
     conn.delete.assert_called_once_with("/api/v4/projects/1/artifacts")
 
 

@@ -31,7 +31,7 @@ from cicd_aiops.ops import artifacts as artifact_ops
 from cicd_aiops.ops import pipelines as pipe_ops
 from cicd_aiops.ops import repos as repo_ops
 from cicd_aiops.ops import runners as runner_ops
-from cicd_aiops.ops._util import age_days, num, s
+from cicd_aiops.ops._util import age_days, as_int, s
 from cicd_aiops.platform import GITLAB
 
 # ── pipeline retry / cancel (priorState only — irreversible) ─────────────────
@@ -148,7 +148,7 @@ def delete_artifacts(conn: Any, project: str, older_than_days: float = 0.0) -> d
         "scope": scope,
         "priorState": {
             "count": len(deleted_rows),
-            "bytes": sum(num(a.get("sizeBytes")) for a in deleted_rows),
+            "bytes": sum(as_int(a.get("sizeBytes")) for a in deleted_rows),
             "complete": not inventory_partial,
         },
         "note": (

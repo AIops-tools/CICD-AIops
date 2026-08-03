@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **`delete_artifacts` reports the destroyed byte total as an int, not a float** (bug class #2). `priorState.bytes` summed `sizeBytes` through the float helper `num()`, so a byte count came back as e.g. `300.0` — arithmetically right, semantically wrong. Now uses `as_int`; a regression test asserts the type (equality cannot catch `300 == 300.0`). Found by enumerating the write path across the line after the same defect surfaced in queue-aiops's `kill_client`.
+
 ## v0.7.0 — 2026-08-03
 
 ### Fixed
