@@ -73,6 +73,23 @@ def get_connection(target: str | None, config_path: Path | None = None) -> tuple
     return mgr.connect(target), cfg
 
 
+def emit_governed(result: Any) -> Any:
+    """Print a governed write's payload, and FAIL the process when it failed.
+
+    ``@tool_errors("dict")`` flattens an exception into ``{"error": ...}`` and
+    returns it, so a CLI that only pretty-prints the payload reports a rejected
+    or failed write on stdout while exiting 0. Measured on a real Gitea:
+    ``artifacts delete`` printed "Resource 'artifacts_delete' is not available
+    on platform 'gitea'" and still exited 0, so a script could not tell the
+    write had not happened. Same class already fixed in the proxmox / xcpng /
+    veeam / truenas siblings; this repo had not been swept.
+    """
+    console.print_json(json.dumps(result))
+    if isinstance(result, dict) and result.get("error"):
+        raise typer.Exit(1)
+    return result
+
+
 def print_result(result: Any, hint: str = "--limit") -> None:
     """Print a result payload as JSON, then say plainly when it was cut short.
 

@@ -14,6 +14,7 @@ from cicd_aiops.connection import CicdApiError, CicdConnection
 from cicd_aiops.platform import (
     GITEA,
     GITLAB,
+    UnsupportedResource,
     get_platform,
     platform_names,
 )
@@ -39,7 +40,11 @@ def test_path_templates_differ_per_platform():
     assert gl.path("version") == "/api/v4/version"
     assert gt.path("version") == "/api/v1/version"
     assert gl.path("pipelines", project=42) == "/api/v4/projects/42/pipelines"
-    assert gt.path("pipelines", project="dev/api") == "/api/v1/repos/dev/api/actions/runs"
+    # Gitea API v1 has NO pipeline-run resource — asserting a path here is what
+    # kept `/actions/runs` (a 404 on every real server) alive. It must raise.
+    with pytest.raises(UnsupportedResource, match="pipelines"):
+        gt.path("pipelines", project="dev/api")
+    assert gt.path("jobs", project="dev/api") == "/api/v1/repos/dev/api/actions/tasks"
 
 
 @pytest.mark.unit

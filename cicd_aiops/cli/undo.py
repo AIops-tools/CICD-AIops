@@ -7,7 +7,6 @@ path as any other write (the inverse tool it dispatches is itself re-gated).
 
 from __future__ import annotations
 
-import json
 from typing import Annotated
 
 import typer
@@ -16,9 +15,9 @@ from cicd_aiops.cli._common import (
     DryRunOption,
     TargetOption,
     cli_errors,
-    console,
     double_confirm,
     dry_run_preview,
+    emit_governed,
     print_result,
 )
 
@@ -62,4 +61,4 @@ def undo_apply_cmd(
         )
         return
     double_confirm("apply undo", undo_id)
-    console.print_json(json.dumps(gov.undo_apply(undo_id=undo_id, target=target)))
+    emit_governed(gov.undo_apply(undo_id=undo_id, target=target))

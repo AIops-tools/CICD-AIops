@@ -14,6 +14,7 @@ from cicd_aiops.cli._common import (
     console,
     double_confirm,
     dry_run_preview,
+    emit_governed,
     get_connection,
     print_result,
 )
@@ -75,7 +76,7 @@ def runners_pause(
         )
         return
     double_confirm("pause runner", runner)
-    console.print_json(json.dumps(gov.pause_runner(runner=runner, target=target)))
+    emit_governed(gov.pause_runner(runner=runner, target=target))
 
 
 @runners_app.command("resume")
@@ -99,4 +100,4 @@ def runners_resume(
         )
         return
     double_confirm("resume runner", runner)
-    console.print_json(json.dumps(gov.resume_runner(runner=runner, target=target)))
+    emit_governed(gov.resume_runner(runner=runner, target=target))

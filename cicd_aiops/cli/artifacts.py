@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Annotated
 
 import typer
@@ -11,9 +10,9 @@ from cicd_aiops.cli._common import (
     DryRunOption,
     TargetOption,
     cli_errors,
-    console,
     double_confirm,
     dry_run_preview,
+    emit_governed,
     get_connection,
     print_result,
 )
@@ -75,10 +74,8 @@ def artifacts_delete(
         )
         return
     double_confirm(f"delete artifacts ({scope})", project)
-    console.print_json(
-        json.dumps(
-            gov.delete_artifacts(
-                project=project, older_than_days=older_than_days, target=target
-            )
+    emit_governed(
+        gov.delete_artifacts(
+            project=project, older_than_days=older_than_days, target=target
         )
     )

@@ -113,16 +113,32 @@ def test_list_pipelines_gitlab_shape():
 
 
 @pytest.mark.unit
-def test_list_pipelines_gitea_workflow_runs_shape():
+def test_list_pipelines_on_gitea_reports_the_missing_resource():
+    """Gitea API v1 exposes no pipeline-run listing — say so, do not 404.
+
+    This test previously asserted that a `workflow_runs` payload came back from
+    `/actions/runs`, a path that does not exist on any Gitea (confirmed against
+    1.24.7's own swagger.v1.json). Every pipeline call therefore 404'd on a real
+    server while the mock stayed green. The row-level `workflow_runs` unwrapping
+    is still exercised through the `jobs` resource, which is the real endpoint.
+    """
+    conn = _Conn({}, platform=GITEA)
+    out = pipelines.list_pipelines(conn, "dev/web")
+    assert "not available on platform 'gitea'" in out["error"]
+    assert out["project"] == "dev/web"
+
+
+@pytest.mark.unit
+def test_list_jobs_gitea_workflow_runs_shape():
+    """Gitea's `/actions/tasks` wraps its rows under `workflow_runs`."""
     conn = _Conn(
-        {_p(GITEA, "pipelines", project="dev/web"): {"workflow_runs": [
+        {_p(GITEA, "jobs", project="dev/web"): {"workflow_runs": [
             {"id": 3, "status": "failure", "head_branch": "main", "head_sha": "aa"},
         ]}},
         platform=GITEA,
     )
-    out = pipelines.list_pipelines(conn, "dev/web")
-    assert out["returned"] == 1
-    assert out["pipelines"][0]["ref"] == "main"
+    rows = conn.platform.rows(conn.get(conn.platform.path("jobs", project="dev/web")))
+    assert len(rows) == 1 and rows[0]["head_branch"] == "main"
 
 
 @pytest.mark.unit

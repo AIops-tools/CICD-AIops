@@ -251,10 +251,15 @@ _GITEA_PATHS = {
     # projects (repositories)
     "projects": "/api/v1/repos/search",
     "project": "/api/v1/repos/{project}",
-    # pipelines (Gitea Actions runs) + jobs
-    "pipelines": "/api/v1/repos/{project}/actions/runs",
-    "pipeline": "/api/v1/repos/{project}/actions/runs/{pipeline}",
-    "pipeline_jobs": "/api/v1/repos/{project}/actions/runs/{pipeline}/jobs",
+    # Jobs — but NOT pipeline runs. Gitea API v1 has no run-level resource:
+    # `/actions/runs`, `/actions/runs/{id}` and `/actions/runs/{id}/jobs` do not
+    # exist (confirmed against the server's own swagger.v1.json on 1.24.7, where
+    # the only `/actions/runs/...` path is `/{run}/artifacts`). They were mapped
+    # anyway, so every pipeline call 404'd on a real Gitea. `/actions/tasks` is
+    # the per-JOB listing — its rows are individual jobs that share a
+    # `run_number`, despite the payload calling them `workflow_runs`. Leaving
+    # the run-level keys unmapped makes them raise UnsupportedResource, which
+    # names the limit instead of returning a 404 nobody can act on.
     "jobs": "/api/v1/repos/{project}/actions/tasks",
     "job_trace": "/api/v1/repos/{project}/actions/jobs/{job}/logs",
     # repo surface

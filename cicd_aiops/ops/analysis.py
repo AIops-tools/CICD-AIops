@@ -28,6 +28,16 @@ from typing import Any
 from cicd_aiops.ops import pipelines as pipe_ops
 from cicd_aiops.ops._util import age_days, age_seconds, num, opt, s
 
+
+class PipelineProbeFailed(RuntimeError):  # noqa: N818 — reads as a statement, like UnsupportedResource
+    """The failed-pipeline listing could not be read at all.
+
+    Distinct from "there are no failed pipelines": a probe that never ran must
+    not be summarised as a healthy zero. Raised by ``pull_failed_pipelines`` so
+    the RCA reports the reason (a 404, an auth error, or a platform that has no
+    pipeline-run resource) rather than an empty, confident result.
+    """
+
 MAX_ROWS = 100
 
 
@@ -163,6 +173,13 @@ def pull_failed_pipelines(
     truncated tail is a hypothesis, not a verdict.
     """
     listed = pipe_ops.list_pipelines(conn, project, status="failed", limit=limit)
+    # "Could not look" must never render as "nothing is failing". list_pipelines
+    # reports a failed probe as an {"error": ...} envelope, and reading
+    # .get("pipelines", []) off it produced a clean, confident zero — measured
+    # on a real Gitea, where the run listing 404'd while the server held a
+    # genuinely failed job. Re-raise so the RCA reports the probe failure.
+    if isinstance(listed, dict) and listed.get("error"):
+        raise PipelineProbeFailed(str(listed["error"]))
     out: list[dict] = []
     for p in listed.get("pipelines", []) if isinstance(listed, dict) else []:
         jobs = pipe_ops.pipeline_jobs(conn, project, p["id"])

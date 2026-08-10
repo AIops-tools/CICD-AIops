@@ -26,9 +26,9 @@ are GitLab-only in v0.1.
 | `cicd_overview` | version + identity + projects + runners | (composite) | (composite) |
 | `list_projects` | projects w/ storage bytes | `/api/v4/projects?statistics=true` | `/api/v1/repos/search` |
 | `project_detail` | one project incl. sizes | `/api/v4/projects/{p}` | `/api/v1/repos/{owner}/{repo}` |
-| `list_pipelines` | recent pipelines/runs | `/api/v4/projects/{p}/pipelines` | `/api/v1/repos/{o}/{r}/actions/runs` |
-| `pipeline_detail` | one pipeline/run | `.../pipelines/{id}` | `.../actions/runs/{id}` |
-| `pipeline_jobs` | jobs + failure_reason | `.../pipelines/{id}/jobs` | `.../actions/runs/{id}/jobs` |
+| `list_pipelines` | recent pipelines/runs | `/api/v4/projects/{p}/pipelines` | **unsupported** — Gitea API v1 has no run-level resource |
+| `pipeline_detail` | one pipeline/run | `.../pipelines/{id}` | **unsupported** (same reason) |
+| `pipeline_jobs` | jobs + failure_reason | `.../pipelines/{id}/jobs` | **unsupported**; the per-job listing is `/actions/tasks` |
 | `job_trace_tail` | last N log lines | `.../jobs/{id}/trace` | `.../actions/jobs/{id}/logs` |
 | `list_runners` | fleet, offline first | `/api/v4/runners/all` | — teaching error |
 | `runner_detail` | contacted_at, tags, paused | `/api/v4/runners/{id}` | — teaching error |

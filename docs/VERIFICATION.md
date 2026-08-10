@@ -54,5 +54,51 @@ pattern right — this repo had diverged from it.
   registered runner executed a job that really failed, so the RCA classified
   real failures rather than an empty list. The **Gitea** side still has no
   runner attached.
-- **Guarded writes** (`pipelines retry/cancel`, `runners pause/resume`,
-  `artifacts delete`) and their undo paths.
+- **Guarded writes on GitLab** — `runners pause/resume` (with undo) and
+  `pipelines retry` were closed on 2026-08-03; `pipelines cancel` and
+  `artifacts delete` against a live GitLab are still open. The
+  `delete_artifacts` byte-total fix shipped in this round is **unit-tested
+  only** — it was found by enumerating the write path across the line, not by a
+  live run.
+
+## Gitea — live-verified 2026-08-04 (Gitea 1.24.7 + act_runner v0.6.1)
+
+A real repository, a registered runner, and a workflow whose jobs genuinely
+ran: `build` succeeded and `failing-test` exited 7. `doctor` reported the
+version and authenticated identity; `overview` and `projects` matched the
+server. **Three defects, two of them serious:**
+
+- 🔴 **The whole pipeline surface had never worked on Gitea.** `pipelines`,
+  `pipeline` and `pipeline_jobs` were mapped to `/api/v1/repos/{p}/actions/runs`
+  and its children — **paths that do not exist**. Confirmed against the
+  server's own `swagger.v1.json`: the only `/actions/runs/...` path is
+  `/{run}/artifacts`, and the real listing is `/actions/tasks`, whose rows are
+  individual **jobs** sharing a `run_number` (despite the payload naming them
+  `workflow_runs`). Gitea API v1 has no run-level resource at all, so the three
+  keys are now unmapped and raise the repo's own `UnsupportedResource` teaching
+  error instead of a 404 nobody can act on.
+- 🔴 **The pipeline RCA reported a clean zero while it could not look.**
+  `rca pipelines` returned `pipelinesEvaluated: 0, pipelines: []` — a confident
+  "nothing is failing" — on a server that held a genuinely failed job, because
+  the 404 came back as an `{"error": ...}` envelope and
+  `.get("pipelines", [])` read it as empty. That is bug class #3: a failure
+  presented as health. `pull_failed_pipelines` now raises `PipelineProbeFailed`,
+  so the RCA reports why it could not look.
+- 🔴 **Every governed write exited 0 on failure.** All 12 CLI write call sites
+  printed the governed payload without checking it, so `artifacts delete`
+  printed "Resource 'artifacts_delete' is not available on platform 'gitea'"
+  and still exited 0 — a script could not tell the write had not happened. The
+  same class was already fixed in the proxmox / xcpng / veeam / truenas
+  siblings; this repo had not been swept. Now routed through `emit_governed`,
+  which mirrors what `dry_run_preview` already did for previews. Verified live:
+  exit 1 on a refused write, 0 on a successful read.
+
+**What Gitea genuinely cannot do, and is now reported as such**: instance-wide
+runner listing (the API is repo/org/user-scoped only — there is no admin runner
+endpoint) and bulk artifact deletion (only `DELETE .../artifacts/{id}` exists).
+
+**Not verified, with a measured reason**: `delete_artifacts` could not be
+exercised here because Gitea's artifact API stayed empty — `upload-artifact@v3`
+reported success (200003 bytes) yet neither `/actions/artifacts` nor
+`/actions/runs/{run}/artifacts` ever listed it, and `@v4` fails outright on
+act_runner v0.6.1. That is a Gitea/act_runner limitation, not a tool defect.

@@ -249,3 +249,45 @@ def test_stale_work_audit_empty():
     assert out["counts"] == {
         "staleMergeRequests": 0, "staleBranches": 0, "protectionGaps": 0,
     }
+
+
+@pytest.mark.unit
+def test_pull_failed_pipelines_raises_when_the_listing_could_not_be_read():
+    """A probe that failed must never render as "nothing is failing".
+
+    `list_pipelines` reports a failed probe as an {"error": ...} envelope.
+    Reading .get("pipelines", []) off that produced a confident zero: measured
+    on a real Gitea, `rca pipelines` returned pipelinesEvaluated: 0 with an
+    empty list while the server held a genuinely failed job and the underlying
+    call had 404'd. That is a failure presented as health.
+    """
+    class _Conn:
+        pass
+
+    def _listing_failed(conn, project, status=None, limit=0):
+        return {"error": "Resource 'pipelines' is not available on platform 'gitea'.",
+                "project": project}
+
+    original = ops.pipe_ops.list_pipelines
+    ops.pipe_ops.list_pipelines = _listing_failed
+    try:
+        with pytest.raises(ops.PipelineProbeFailed, match="not available on platform"):
+            ops.pull_failed_pipelines(_Conn(), "dev/web")
+    finally:
+        ops.pipe_ops.list_pipelines = original
+
+
+@pytest.mark.unit
+def test_pull_failed_pipelines_still_returns_empty_for_a_genuinely_clean_project():
+    """The guard must distinguish "could not look" from "looked, found none"."""
+    class _Conn:
+        pass
+
+    original = ops.pipe_ops.list_pipelines
+    ops.pipe_ops.list_pipelines = lambda conn, project, status=None, limit=0: {
+        "pipelines": [], "returned": 0, "limit": 10, "truncated": False,
+    }
+    try:
+        assert ops.pull_failed_pipelines(_Conn(), "dev/web") == []
+    finally:
+        ops.pipe_ops.list_pipelines = original

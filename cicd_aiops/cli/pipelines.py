@@ -14,6 +14,7 @@ from cicd_aiops.cli._common import (
     console,
     double_confirm,
     dry_run_preview,
+    emit_governed,
     get_connection,
     print_result,
 )
@@ -112,9 +113,7 @@ def pipelines_retry(
         )
         return
     double_confirm("retry pipeline", f"{project}#{pipeline}")
-    console.print_json(
-        json.dumps(gov.retry_pipeline(project=project, pipeline=pipeline, target=target))
-    )
+    emit_governed(gov.retry_pipeline(project=project, pipeline=pipeline, target=target))
 
 
 @pipelines_app.command("cancel")
@@ -141,6 +140,4 @@ def pipelines_cancel(
         )
         return
     double_confirm("cancel pipeline", f"{project}#{pipeline}")
-    console.print_json(
-        json.dumps(gov.cancel_pipeline(project=project, pipeline=pipeline, target=target))
-    )
+    emit_governed(gov.cancel_pipeline(project=project, pipeline=pipeline, target=target))
