@@ -27,6 +27,7 @@ from __future__ import annotations
 from typing import Any
 
 from cicd_aiops.connection import CicdApiError
+from cicd_aiops.governance import mark_unknown
 from cicd_aiops.ops import artifacts as artifact_ops
 from cicd_aiops.ops import pipelines as pipe_ops
 from cicd_aiops.ops import repos as repo_ops
@@ -111,6 +112,9 @@ def resume_runner(conn: Any, runner: str) -> dict:
 
 # ── artifact deletion (high — irreversible, priorState = bytes/count) ────────
 
+#: The job log. Listed among a job's artifacts, but not deleted with them.
+_TRACE_FILE_TYPE = "trace"
+
 
 def delete_artifacts(conn: Any, project: str, older_than_days: float = 0.0) -> dict:
     """[WRITE][high] Delete a project's artifacts (all, or older than N days).
@@ -137,20 +141,54 @@ def delete_artifacts(conn: Any, project: str, older_than_days: float = 0.0) -> d
                 conn.platform.path("job_artifacts_delete", project=project, job=job_id)
             )
         scope = f"older than {older_than_days:g} days"
-        deleted_rows = matching
+        # The job log is listed as an artifact but survives this endpoint —
+        # measured on GitLab 19.2.1: after deleting job artifacts, every
+        # job.log (file_type "trace") was still there. Counting them as
+        # destroyed over-reported an irreversible deletion by three files.
+        deleted_rows = [a for a in matching if a.get("fileType") != _TRACE_FILE_TYPE]
+        queued = False
     else:
         conn.delete(conn.platform.path("artifacts_delete", project=project))
         scope = "all eligible artifacts (server bulk delete)"
         deleted_rows = rows
+        # GitLab answers the project-wide bulk delete with **202 Accepted**: the
+        # request is queued, not performed, and the server decides for itself
+        # which artifacts are *eligible* (locked ones are kept). Measured on
+        # GitLab 19.2.1: 202, and 100 seconds later all seven artifacts were
+        # still present — while this function reported them destroyed and the
+        # audit row said `ok`. That is bug class #13 (submitted != completed) in
+        # its worst form, because the claim is about an irreversible deletion.
+        queued = True
+    prior = {
+        "count": len(deleted_rows),
+        "bytes": sum(as_int(a.get("sizeBytes")) for a in deleted_rows),
+        "complete": not inventory_partial,
+    }
+    if queued:
+        out = mark_unknown({
+            "action": "delete_artifacts",
+            "project": s(project),
+            "scope": scope,
+            # NOT priorState-as-destroyed: this is what existed when the request
+            # was accepted, which is an upper bound on what may be removed.
+            "inventoryAtRequest": prior,
+        })
+        # mark_unknown's stock note says no usable response came back. Here one
+        # did — a 202 — so the reason for the uncertainty is different and the
+        # note is replaced rather than left to mislead.
+        out["note"] = (
+            "Queued, not confirmed. The server accepted the bulk delete (202) "
+            "and performs it asynchronously, removing only the artifacts it "
+            "considers eligible — locked artifacts are kept, so the count above "
+            "is an UPPER bound on what will disappear, not a record of what was "
+            "destroyed. Re-read 'artifacts list' to see the actual outcome."
+        )
+        return out
     return {
         "action": "delete_artifacts",
         "project": s(project),
         "scope": scope,
-        "priorState": {
-            "count": len(deleted_rows),
-            "bytes": sum(as_int(a.get("sizeBytes")) for a in deleted_rows),
-            "complete": not inventory_partial,
-        },
+        "priorState": prior,
         "note": (
             "Irreversible — priorState records what was destroyed; no undo."
             if not inventory_partial

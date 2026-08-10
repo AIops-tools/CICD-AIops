@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.9.0 — 2026-08-10
+
+### Fixed
+- **`delete_artifacts` reported an irreversible destruction that had not happened** (bug class #13 — submitted is not completed). GitLab answers the project-wide bulk delete with **202 Accepted**: it queues the work and later removes only the artifacts it considers *eligible*, keeping locked ones. The tool treated the call as done, returned `priorState` as "what was destroyed", and the audit row said `ok`. Measured on GitLab 19.2.1: 202 came back, and **100 seconds later all seven artifacts were still present** — an audit trail asserting a deletion that never occurred, which is the worst shape this defect can take. The bulk path now returns `outcomeUnknown`, reports the figure as `inventoryAtRequest` (an upper bound, not a receipt), explains that the server decides eligibility, and the CLI exits 2. The per-job path is genuinely synchronous — verified removing real artifacts — and still reports a confirmed result.
+- **The per-job delete over-counted what it destroyed.** A job's log is listed among its artifacts but is *not* removed by that endpoint: after a real delete, every `job.log` (`file_type: "trace"`) was still there while `priorState` claimed all seven files were gone. Traces are now excluded from the destroyed count, and `fileType` is carried on every artifact row so a caller can tell them apart.
+- **The dry-run of that HIGH-risk delete could never say how many artifacts it would remove.** It read `currentCount` from the inventory's `total` key — a key the listing envelope deliberately does not have — so the one number an operator needs before an irreversible deletion was always `null`. It now reads `artifactsFound`, which counts every artifact found rather than just the returned page.
+- **Artifact sizes are integers** (bug class #2). `sizeBytes` and `totalBytes` rendered as floats (`374.0`) although GitLab reports ints; the storage RCA's byte totals had the same defect from `0.0` accumulator seeds. An earlier round fixed only the write path and the changelog implied the whole surface — the read path was still wrong.
+- **The CLI exits 2 on an undetermined outcome**, matching the rest of the line: `emit_governed` only knew about `{"error": ...}`, so a queued-but-unconfirmed write exited 0.
+
 ## v0.8.0 — 2026-08-10
 
 ### Fixed

@@ -117,12 +117,50 @@ def test_delete_artifacts_bulk_captures_inventory(monkeypatch):
         },
     )
     out = ops.delete_artifacts(conn, "1")
-    assert out["priorState"] == {"count": 2, "bytes": 300, "complete": True}
+    # The bulk delete is ASYNCHRONOUS: GitLab answers 202 Accepted and performs
+    # it later, deleting only what it considers eligible. Measured on GitLab
+    # 19.2.1 — 202, and 100 seconds later all seven artifacts were still there,
+    # while this function reported them destroyed and the audit row said `ok`.
+    # So the outcome is undetermined and the inventory is an UPPER bound, not a
+    # record of a destruction (bug class #13).
+    assert out["outcomeUnknown"] is True
+    assert "priorState" not in out
+    assert out["inventoryAtRequest"] == {"count": 2, "bytes": 300, "complete": True}
+    assert "202" in out["note"] and "UPPER bound" in out["note"]
     # bytes is a byte count — an integer quantity, not a float (bug class #2).
     # Equality cannot catch it (300 == 300.0); assert the type explicitly.
-    total = out["priorState"]["bytes"]
+    total = out["inventoryAtRequest"]["bytes"]
     assert isinstance(total, int) and not isinstance(total, bool)
     conn.delete.assert_called_once_with("/api/v4/projects/1/artifacts")
+
+
+@pytest.mark.unit
+def test_delete_artifacts_per_job_does_not_count_the_job_log(monkeypatch):
+    """The trace survives the job-artifacts delete, so it was never destroyed.
+
+    Measured on GitLab 19.2.1: after deleting a project's job artifacts every
+    `job.log` (file_type "trace") was still present, while priorState claimed
+    all seven files had been destroyed — an over-claim of three, on an
+    irreversible operation.
+    """
+    from cicd_aiops.ops import artifacts as artifact_ops
+    from cicd_aiops.ops import writes as ops
+
+    conn = _conn()
+    monkeypatch.setattr(
+        artifact_ops,
+        "list_artifacts",
+        lambda c, p: {
+            "artifacts": [
+                {"jobId": "1", "sizeBytes": 100, "fileType": "archive",
+                 "createdAt": "2026-01-01T00:00:00Z"},
+                {"jobId": "1", "sizeBytes": 900, "fileType": "trace",
+                 "createdAt": "2026-01-01T00:00:00Z"},
+            ]
+        },
+    )
+    out = ops.delete_artifacts(conn, "1", older_than_days=1)
+    assert out["priorState"] == {"count": 1, "bytes": 100, "complete": True}
 
 
 @pytest.mark.unit

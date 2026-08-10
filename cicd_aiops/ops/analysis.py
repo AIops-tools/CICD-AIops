@@ -26,7 +26,7 @@ from datetime import datetime
 from typing import Any
 
 from cicd_aiops.ops import pipelines as pipe_ops
-from cicd_aiops.ops._util import age_days, age_seconds, num, opt, s
+from cicd_aiops.ops._util import age_days, age_seconds, as_int, num, opt, s
 
 
 class PipelineProbeFailed(RuntimeError):  # noqa: N818 — reads as a statement, like UnsupportedResource
@@ -415,19 +415,19 @@ def artifact_storage_bloat_analysis(
     older than ``old_artifact_days``. Every ranking carries its byte numbers.
     """
     ranked = []
-    total_reclaimable = 0.0
+    total_reclaimable = 0
     art_bytes_unknown = 0
     for p in projects or []:
         path = s(p.get("path"))
-        repo_b = num(p.get("repoBytes"))
+        repo_b = as_int(p.get("repoBytes"))
         art_known = p.get("artifactsBytes") is not None
         art_bytes_unknown += 0 if art_known else 1
-        art_b = num(p.get("artifactsBytes"))
+        art_b = as_int(p.get("artifactsBytes"))
         rows = (artifacts_by_project or {}).get(path, [])
-        expired_b = old_b = 0.0
+        expired_b = old_b = 0
         expired_n = old_n = 0
         for a in rows:
-            size = num(a.get("sizeBytes"))
+            size = as_int(a.get("sizeBytes"))
             expire_age = age_days(a.get("expireAt"), now)
             created_age = age_days(a.get("createdAt"), now)
             if a.get("expireAt") and expire_age is not None and expire_age > 0:

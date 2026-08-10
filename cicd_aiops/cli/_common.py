@@ -73,6 +73,11 @@ def get_connection(target: str | None, config_path: Path | None = None) -> tuple
     return mgr.connect(target), cfg
 
 
+#: Exit status for a write whose outcome could not be determined — kept
+#: distinct from 0 (confirmed) and 1 (failed) so a script can tell all three apart.
+EXIT_UNDETERMINED = 2
+
+
 def emit_governed(result: Any) -> Any:
     """Print a governed write's payload, and FAIL the process when it failed.
 
@@ -87,6 +92,11 @@ def emit_governed(result: Any) -> Any:
     console.print_json(json.dumps(result))
     if isinstance(result, dict) and result.get("error"):
         raise typer.Exit(1)
+    if isinstance(result, dict) and result.get("outcomeUnknown"):
+        # Neither success nor failure: the change may still land (GitLab's bulk
+        # artifact delete answers 202 and runs asynchronously). Exiting 0 here
+        # would tell a script the deletion is done when nothing is confirmed.
+        raise typer.Exit(EXIT_UNDETERMINED)
     return result
 
 

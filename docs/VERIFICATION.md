@@ -54,12 +54,40 @@ pattern right — this repo had diverged from it.
   registered runner executed a job that really failed, so the RCA classified
   real failures rather than an empty list. The **Gitea** side still has no
   runner attached.
-- **Guarded writes on GitLab** — `runners pause/resume` (with undo) and
-  `pipelines retry` were closed on 2026-08-03; `pipelines cancel` and
-  `artifacts delete` against a live GitLab are still open. The
-  `delete_artifacts` byte-total fix shipped in this round is **unit-tested
-  only** — it was found by enumerating the write path across the line, not by a
-  live run.
+- ~~**Guarded writes on GitLab**~~ — **all closed 2026-08-10 against a live
+  GitLab 19.2.1** (`runners pause/resume` with undo and `pipelines retry` were
+  already closed on 2026-08-03).
+  - `pipelines cancel`: exercised on a **pending** pipeline and on a genuinely
+    **running** one (`priorState.status: "running"`). The dry-run changed
+    nothing; the real call moved exactly the named pipeline to `canceled` and
+    left the other alone.
+  - `artifacts delete`: exercised on both branches, and they behave differently
+    in a way the tool had not accounted for.
+    - The **bulk** path (`older_than_days = 0`) is asynchronous: GitLab answers
+      **202 Accepted** and removes only what it deems eligible. It reported a
+      completed, irreversible destruction of 7 artifacts / 13,673 bytes and
+      audited `ok`, while **100 seconds later all seven were still on the
+      server**. Now returns `outcomeUnknown`, reports `inventoryAtRequest` as an
+      upper bound, and exits 2.
+    - The **per-job** path is synchronous and genuinely works — the archives
+      really disappeared. It over-counted, though: a job's `job.log`
+      (`file_type: "trace"`) is listed as an artifact but survives that
+      endpoint, so three files were claimed destroyed that were not. Traces are
+      now excluded and `fileType` is exposed on every row.
+    - The dry-run's `currentCount` had always been `null` (it read a `total` key
+      the listing envelope does not define), so the blast radius of a HIGH-risk
+      irreversible delete was never stated. Fixed and verified: it now reports 7.
+  - That run also showed artifact sizes rendering as floats on the **read** path
+    — the earlier round fixed only the write path, and this document implied the
+    whole surface was done. It was not; it is now.
+
+## Still open
+
+- **The `search_limit`-style scale questions**: the lab project had a handful of
+  jobs, so nothing here exercises pagination of a large artifact inventory.
+- **Gitea artifacts** remain unexercisable: `upload-artifact@v3` reports success
+  but the artifact API stays empty, and `@v4` fails outright on act_runner
+  v0.6.1 — a platform limitation, not a tool defect.
 
 ## Gitea — live-verified 2026-08-10 (Gitea 1.24.7 + act_runner v0.6.1)
 

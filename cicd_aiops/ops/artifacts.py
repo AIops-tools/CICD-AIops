@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cicd_aiops.ops._util import age_days, listing, num, opt, page_limit, pick, s
+from cicd_aiops.ops._util import age_days, as_int, listing, opt, page_limit, pick, s
 from cicd_aiops.platform import GITLAB
 
 _MAX_JOBS = 100
@@ -49,7 +49,11 @@ def _gitlab_artifact_rows(conn: Any, project: str) -> tuple[list[dict], bool, in
                     "jobId": s(pick(job, "id")),
                     "jobName": opt(pick(job, "name")),
                     "file": s(pick(f, "filename", "file_type")),
-                    "sizeBytes": num(pick(f, "size", default=0)),
+                    # The job log is listed as an artifact but is NOT removed by
+                    # the job-artifacts delete, so callers must be able to tell
+                    # it apart before counting what a deletion destroys.
+                    "fileType": opt(pick(f, "file_type")),
+                    "sizeBytes": as_int(pick(f, "size", default=0)),
                     "createdAt": opt(pick(job, "finished_at", "created_at")),
                     "expireAt": opt(expire_at),
                 }
@@ -64,7 +68,8 @@ def _gitea_artifact_rows(conn: Any, project: str) -> list[dict]:
             "jobId": opt(pick(r, "workflow_run_id", "run_id")),
             "jobName": opt(pick(r, "workflow_name")),
             "file": s(pick(r, "name")),
-            "sizeBytes": num(pick(r, "size_in_bytes", "size", default=0)),
+            "fileType": opt(pick(r, "file_type")),
+            "sizeBytes": as_int(pick(r, "size_in_bytes", "size", default=0)),
             "createdAt": opt(pick(r, "created_at")),
             "expireAt": opt(pick(r, "expires_at")),
         }

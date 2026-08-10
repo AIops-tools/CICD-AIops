@@ -277,7 +277,14 @@ def delete_artifacts(
                 "project": project,
                 "olderThanDays": older_than_days,
                 "path": path,
-                "currentCount": inventory.get("total"),
+                # "artifactsFound", not "total": the listing envelope has no
+                # "total" by design (it only ever sees the already-sliced page),
+                # so this read was always None — the preview of a HIGH-risk,
+                # irreversible delete could never say how many artifacts it
+                # would remove, which is the one number the operator needs.
+                # artifactsFound counts EVERY artifact found, not just the
+                # returned page, so it is the blast radius.
+                "currentCount": inventory.get("artifactsFound"),
                 "currentBytes": inventory.get("totalBytes"),
                 "expiredButKept": inventory.get("expiredButKept"),
             },
