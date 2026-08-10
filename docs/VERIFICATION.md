@@ -61,7 +61,7 @@ pattern right — this repo had diverged from it.
   only** — it was found by enumerating the write path across the line, not by a
   live run.
 
-## Gitea — live-verified 2026-08-04 (Gitea 1.24.7 + act_runner v0.6.1)
+## Gitea — live-verified 2026-08-10 (Gitea 1.24.7 + act_runner v0.6.1)
 
 A real repository, a registered runner, and a workflow whose jobs genuinely
 ran: `build` succeeded and `failing-test` exited 7. `doctor` reported the

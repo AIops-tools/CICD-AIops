@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.8.0 — 2026-08-10
 
 ### Fixed
 - **The entire pipeline surface was broken on Gitea.** `pipelines`, `pipeline` and `pipeline_jobs` were mapped to `/api/v1/repos/{project}/actions/runs` and its children — paths that **do not exist on any Gitea** (confirmed against 1.24.7's own `swagger.v1.json`, where the only `/actions/runs/...` path is `/{run}/artifacts`). Every pipeline call 404'd on a real server. Gitea API v1 has no run-level resource — `/actions/tasks` is the per-**job** listing, whose rows share a `run_number` despite the payload calling them `workflow_runs` — so the three keys are now unmapped and raise the teaching `UnsupportedResource` error naming what the platform does offer.
