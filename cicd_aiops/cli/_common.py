@@ -90,13 +90,18 @@ def emit_governed(result: Any) -> Any:
     veeam / truenas siblings; this repo had not been swept.
     """
     console.print_json(json.dumps(result))
-    if isinstance(result, dict) and result.get("error"):
-        raise typer.Exit(1)
+    # ``outcomeUnknown`` is judged BEFORE ``error``, matching the harness: a
+    # write whose response was lost carries BOTH keys, and it is audited
+    # `unknown` precisely because it may have taken effect. Reporting that as a
+    # plain failure would tell a script the change did not happen and invite the
+    # double-apply the payload's own note warns about.
     if isinstance(result, dict) and result.get("outcomeUnknown"):
         # Neither success nor failure: the change may still land (GitLab's bulk
         # artifact delete answers 202 and runs asynchronously). Exiting 0 here
         # would tell a script the deletion is done when nothing is confirmed.
         raise typer.Exit(EXIT_UNDETERMINED)
+    if isinstance(result, dict) and result.get("error"):
+        raise typer.Exit(1)
     return result
 
 
