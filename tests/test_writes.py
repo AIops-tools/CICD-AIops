@@ -7,6 +7,7 @@ and the undo descriptors invert correctly and are replayable. No real server —
 the connection is a MagicMock.
 """
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -169,18 +170,25 @@ def test_delete_artifacts_older_than_deletes_per_matching_job(monkeypatch):
     from cicd_aiops.ops import writes as ops
 
     conn = _conn()
+    # The cutoff is computed against the clock, so the fixture has to be too.
+    # These were once fixed dates chosen to straddle a 30-day window, which made
+    # the test a time bomb: it passed when written and started failing once the
+    # "recent" date aged past the cutoff.
+    now = datetime.now(timezone.utc)
+    stale = (now - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    fresh = (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
     monkeypatch.setattr(
         artifact_ops,
         "list_artifacts",
         lambda c, p: {
             "artifacts": [
-                {"jobId": "10", "sizeBytes": 500, "createdAt": "2026-01-01T00:00:00Z"},
-                {"jobId": "11", "sizeBytes": 700, "createdAt": "2026-07-16T00:00:00Z"},
+                {"jobId": "10", "sizeBytes": 500, "createdAt": stale},
+                {"jobId": "11", "sizeBytes": 700, "createdAt": fresh},
             ]
         },
     )
     out = ops.delete_artifacts(conn, "1", older_than_days=30)
-    # only the January artifact matches → only job 10's artifacts deleted
+    # only the 90-day-old artifact matches → only job 10's artifacts deleted
     assert out["priorState"] == {"count": 1, "bytes": 500, "complete": True}
     conn.delete.assert_called_once_with("/api/v4/projects/1/jobs/10/artifacts")
 
