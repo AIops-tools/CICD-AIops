@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "cicd-aiops",
+  "displayName": "CICD AIops",
+  "version": "0.9.0",
+  "description": "Governed self-managed GitLab + Gitea CI/CD ops: pipelines, runners, artifacts, RCA. 28 tools.",
+  "author": {
+    "name": "Wei Zhou",
+    "email": "zhouwei008@gmail.com",
+    "url": "https://github.com/AIops-tools"
+  },
+  "homepage": "https://github.com/AIops-tools/CICD-AIops",
+  "repository": "https://github.com/AIops-tools/CICD-AIops",
+  "license": "MIT",
+  "keywords": [
+    "aiops",
+    "mcp",
+    "governance",
+    "cicd"
+  ]
+}
