@@ -86,8 +86,8 @@ def emit_governed(result: Any) -> Any:
     or failed write on stdout while exiting 0. Measured on a real Gitea:
     ``artifacts delete`` printed "Resource 'artifacts_delete' is not available
     on platform 'gitea'" and still exited 0, so a script could not tell the
-    write had not happened. Same class already fixed in the proxmox / xcpng /
-    veeam / truenas siblings; this repo had not been swept.
+    write had not happened. This defect class had already been fixed in four
+    other tools in the line before this repo was swept for it.
     """
     console.print_json(json.dumps(result))
     # ``outcomeUnknown`` is judged BEFORE ``error``, matching the harness: a
