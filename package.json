@@ -1,6 +1,6 @@
 {
   "name": "@aiops-tools/cicd-aiops",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "Governed self-managed GitLab + Gitea CI/CD ops: pipelines, runners, artifacts, RCA. 28 tools.",
   "private": true,
   "license": "MIT",
