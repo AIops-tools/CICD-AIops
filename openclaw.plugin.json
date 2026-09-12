@@ -1,0 +1,24 @@
+{
+  "id": "cicd-aiops",
+  "name": "CICD AIops",
+  "description": "Governed self-managed GitLab + Gitea CI/CD ops: pipelines, runners, artifacts, RCA. 28 tools.",
+  "skills": [
+    "./skills"
+  ],
+  "mcpServers": {
+    "cicd-aiops": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "cicd-aiops==0.10.0",
+        "cicd-aiops-mcp"
+      ]
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

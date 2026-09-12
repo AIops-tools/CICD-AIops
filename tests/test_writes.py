@@ -7,7 +7,7 @@ and the undo descriptors invert correctly and are replayable. No real server —
 the connection is a MagicMock.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -174,7 +174,7 @@ def test_delete_artifacts_older_than_deletes_per_matching_job(monkeypatch):
     # These were once fixed dates chosen to straddle a 30-day window, which made
     # the test a time bomb: it passed when written and started failing once the
     # "recent" date aged past the cutoff.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stale = (now - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
     fresh = (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
     monkeypatch.setattr(
