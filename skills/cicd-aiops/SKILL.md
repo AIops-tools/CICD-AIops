@@ -82,7 +82,7 @@ cicd-aiops doctor     # version endpoint + token-scope probe per target
 Or as an OpenClaw plugin, which installs this skill and its MCP server together:
 
 ```bash
-openclaw plugins install clawhub:@aiops-tools/cicd-aiops
+openclaw plugins install clawhub:@zw008/cicd-aiops
 openclaw skills info cicd-aiops          # expect: Visible to model: yes
 ```
 
