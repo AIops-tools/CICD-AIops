@@ -79,6 +79,13 @@ cicd-aiops init       # wizard: pick platform (gitlab/gitea) + base URL + encryp
 cicd-aiops doctor     # version endpoint + token-scope probe per target
 ```
 
+Or as an OpenClaw plugin, which installs this skill and its MCP server together:
+
+```bash
+openclaw plugins install clawhub:@aiops-tools/cicd-aiops
+openclaw skills info cicd-aiops          # expect: Visible to model: yes
+```
+
 ## When to Use This Skill
 
 - Get a one-shot snapshot (`overview` / `server_version` / `current_user`)
