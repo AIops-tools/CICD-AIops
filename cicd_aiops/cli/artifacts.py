@@ -9,6 +9,7 @@ import typer
 from cicd_aiops.cli._common import (
     DryRunOption,
     TargetOption,
+    audited,
     cli_errors,
     double_confirm,
     dry_run_preview,
@@ -28,6 +29,7 @@ ProjectArg = Annotated[str, typer.Argument(help="Project id or full path")]
 
 @artifacts_app.command("list")
 @cli_errors
+@audited
 def artifacts_list(
     project: ProjectArg,
     limit: Annotated[int, typer.Option("--limit", "-n", help="Max rows")] = 500,

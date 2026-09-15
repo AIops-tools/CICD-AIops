@@ -9,6 +9,7 @@ import typer
 
 from cicd_aiops.cli._common import (
     TargetOption,
+    audited,
     cli_errors,
     console,
     get_connection,
@@ -17,6 +18,7 @@ from cicd_aiops.cli._common import (
 
 
 @cli_errors
+@audited
 def overview_cmd(target: TargetOption = None) -> None:
     """One-shot summary: version, token identity, projects, runners."""
     from cicd_aiops.ops import overview as ops
@@ -26,6 +28,7 @@ def overview_cmd(target: TargetOption = None) -> None:
 
 
 @cli_errors
+@audited
 def projects_cmd(
     search: Annotated[
         str | None, typer.Option("--search", "-s", help="Filter projects by name")

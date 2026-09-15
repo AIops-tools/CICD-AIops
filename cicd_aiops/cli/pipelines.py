@@ -10,6 +10,7 @@ import typer
 from cicd_aiops.cli._common import (
     DryRunOption,
     TargetOption,
+    audited,
     cli_errors,
     console,
     double_confirm,
@@ -30,6 +31,7 @@ ProjectArg = Annotated[str, typer.Argument(help="Project id or full path")]
 
 @pipelines_app.command("list")
 @cli_errors
+@audited
 def pipelines_list(
     project: ProjectArg,
     status: Annotated[
@@ -47,6 +49,7 @@ def pipelines_list(
 
 @pipelines_app.command("show")
 @cli_errors
+@audited
 def pipelines_show(
     project: ProjectArg,
     pipeline: Annotated[str, typer.Argument(help="Pipeline id (from 'pipelines list')")],
@@ -61,6 +64,7 @@ def pipelines_show(
 
 @pipelines_app.command("jobs")
 @cli_errors
+@audited
 def pipelines_jobs(
     project: ProjectArg,
     pipeline: Annotated[str, typer.Argument(help="Pipeline id (from 'pipelines list')")],
@@ -76,6 +80,7 @@ def pipelines_jobs(
 
 @pipelines_app.command("trace")
 @cli_errors
+@audited
 def pipelines_trace(
     project: ProjectArg,
     job: Annotated[str, typer.Argument(help="Job id (from 'pipelines jobs')")],

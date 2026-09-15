@@ -8,6 +8,7 @@ import typer
 
 from cicd_aiops.cli._common import (
     TargetOption,
+    audited,
     cli_errors,
     get_connection,
     print_result,
@@ -25,6 +26,7 @@ ProjectArg = Annotated[str, typer.Argument(help="Project id or full path")]
 
 @rca_app.command("pipelines")
 @cli_errors
+@audited
 def rca_pipelines(
     project: ProjectArg,
     limit: Annotated[int, typer.Option("--limit", "-n", help="Failed pipelines to pull")] = 10,
@@ -40,6 +42,7 @@ def rca_pipelines(
 
 @rca_app.command("runners")
 @cli_errors
+@audited
 def rca_runners(target: TargetOption = None) -> None:
     """Flag offline/stale/paused runners and tag saturation."""
     from cicd_aiops.ops import analysis as ops
@@ -51,6 +54,7 @@ def rca_runners(target: TargetOption = None) -> None:
 
 @rca_app.command("storage")
 @cli_errors
+@audited
 def rca_storage(
     old_days: Annotated[
         float, typer.Option("--old-days", help="Artifact age (days) counted reclaimable")
@@ -68,6 +72,7 @@ def rca_storage(
 
 @rca_app.command("stale")
 @cli_errors
+@audited
 def rca_stale(
     project: ProjectArg,
     mr_days: Annotated[float, typer.Option("--mr-days", help="Open-MR idle threshold")] = 14.0,

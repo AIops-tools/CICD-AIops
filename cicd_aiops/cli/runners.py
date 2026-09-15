@@ -10,6 +10,7 @@ import typer
 from cicd_aiops.cli._common import (
     DryRunOption,
     TargetOption,
+    audited,
     cli_errors,
     console,
     double_confirm,
@@ -28,6 +29,7 @@ runners_app = typer.Typer(
 
 @runners_app.command("list")
 @cli_errors
+@audited
 def runners_list(
     status: Annotated[
         str | None, typer.Option("--status", help="Filter: online, offline, paused, stale")
@@ -44,6 +46,7 @@ def runners_list(
 
 @runners_app.command("show")
 @cli_errors
+@audited
 def runners_show(
     runner: Annotated[str, typer.Argument(help="Runner id (from 'runners list')")],
     target: TargetOption = None,
