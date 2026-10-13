@@ -90,7 +90,7 @@ artifacts endpoint, so the inventory is assembled by walking recent jobs. When
 ## What still needs a prompt
 
 These are model-behaviour problems the harness cannot fix from the outside.
-Copy this into your agent's system prompt:
+Recommended setup for a local model (adapt it to your agent client):
 
 ```text
 You operate self-managed GitLab / Gitea CI/CD servers through the cicd-aiops
