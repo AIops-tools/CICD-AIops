@@ -40,14 +40,17 @@ def cicd_overview(conn: Any) -> dict:
     # null and 'runnersSupported' says why — a null that means "this platform
     # has no runner API" must never be read as "there are no runners".
     runners_supported = conn.platform.supports("runners")
-    runners_total = runners_online = None
+    runners_total = runners_online = runners_unknown = None
     runners_truncated = False
     if runners_supported:
         rl = runner_ops.list_runners(conn)
         if isinstance(rl, dict) and "error" not in rl:
             rows = rl.get("runners", [])
             runners_total = rl.get("returned")
-            runners_online = sum(1 for r in rows if r.get("online"))
+            runners_online = sum(1 for r in rows if r.get("online") is True)
+            # Neither online nor offline was reported: not part of the gap
+            # between total and online that a reader would take as offline.
+            runners_unknown = sum(1 for r in rows if r.get("online") is None)
             runners_truncated = bool(rl.get("truncated"))
         elif isinstance(rl, dict):
             errors.append(f"runners: {rl['error']}")
@@ -62,6 +65,7 @@ def cicd_overview(conn: Any) -> dict:
         "runnersSupported": runners_supported,
         "runnersTotal": runners_total,
         "runnersOnline": runners_online,
+        "runnersStateUnknown": runners_unknown,
         "runnersTruncated": runners_truncated,
         "errors": errors,
         "note": (

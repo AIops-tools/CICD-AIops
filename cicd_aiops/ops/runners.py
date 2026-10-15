@@ -15,6 +15,27 @@ from cicd_aiops.ops._util import as_obj, listing, opt, page_limit, pick, s
 _MAX_LIST = 100
 
 
+_STATUS_ONLINE = {
+    "online": True,
+    "offline": False,
+    "stale": False,
+    "never_contacted": False,
+    "not_connected": False,  # older GitLab name for never_contacted
+}
+
+
+def _online(r: dict) -> bool | None:
+    """Online flag, else derived from ``status``; ``None`` when neither says.
+
+    GitLab marks ``online`` deprecated in favour of ``status``. A missing flag
+    must not read as offline: that turns "not reported" into an outage finding.
+    """
+    flag = pick(r, "online")
+    if flag is not None:
+        return bool(flag)
+    return _STATUS_ONLINE.get(s(pick(r, "status"), 32).lower())
+
+
 def norm_runner(r: dict) -> dict:
     """Normalise one runner row.
 
@@ -27,7 +48,7 @@ def norm_runner(r: dict) -> dict:
         "description": opt(pick(r, "description", "name")),
         "status": s(pick(r, "status"), 32).lower(),
         "paused": bool(pick(r, "paused", default=not pick(r, "active", default=True))),
-        "online": bool(pick(r, "online", default=False)),
+        "online": _online(r),
         "isShared": bool(pick(r, "is_shared", default=False)),
         "runnerType": opt(pick(r, "runner_type")),
         "tags": [s(t, 64) for t in (r.get("tag_list") or []) if isinstance(t, str)],
@@ -53,7 +74,7 @@ def list_runners(conn: Any, status: str | None = None, limit: int = 100) -> dict
             params["status"] = s(status, 32).lower()
         rows = conn.platform.rows(conn.get(conn.platform.path("runners"), params=params))
         runners = [norm_runner(r) for r in rows]
-        runners.sort(key=lambda r: (r["online"], not r["paused"]))
+        runners.sort(key=lambda r: (r["online"] is True, not r["paused"]))
         truncated = len(runners) > requested
         return listing("runners", runners[:requested], requested, truncated)
     except KeyError:

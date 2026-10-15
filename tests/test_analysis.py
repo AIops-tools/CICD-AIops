@@ -291,3 +291,52 @@ def test_pull_failed_pipelines_still_returns_empty_for_a_genuinely_clean_project
         assert ops.pull_failed_pipelines(_Conn(), "dev/web") == []
     finally:
         ops.pipe_ops.list_pipelines = original
+
+
+# ── Gitea: branch rows have no `default` key; runners may lack `online` ──────
+
+
+@pytest.mark.unit
+def test_gitea_default_branch_is_never_called_stale():
+    # Gitea's Branch object carries no `default`; the default branch is known
+    # only by name (the repo's default_branch).
+    branches = [{"name": "main", "default": False, "protected": True,
+                 "lastCommitAt": "2025-01-01T00:00:00Z"}]
+    out = ops.stale_work_audit([], branches, default_branch="main", now=NOW)
+    assert out["staleBranches"] == []
+    assert out["protectionGaps"] == []  # the protected default is recognised by name
+
+
+@pytest.mark.unit
+def test_runner_without_online_flag_uses_status():
+    from cicd_aiops.ops.runners import norm_runner
+
+    assert norm_runner({"id": 1, "status": "online"})["online"] is True
+    assert norm_runner({"id": 2, "status": "offline"})["online"] is False
+    assert norm_runner({"id": 3})["online"] is None  # neither reported
+
+
+@pytest.mark.unit
+def test_runner_with_unknown_state_is_not_called_offline():
+    runners = [{"id": "9", "status": "", "online": None, "paused": False,
+                "contactedAt": None, "tags": []}]
+    out = ops.runner_health_rca(runners, [], now=NOW)
+    (flag,) = out["flaggedRunners"]
+    assert "offline" not in flag["cause"].lower()
+    assert flag["online"] is None
+
+
+@pytest.mark.unit
+def test_gitea_branch_default_flag_is_unknown_not_false():
+    from cicd_aiops.ops.repos import norm_branch
+
+    assert norm_branch({"name": "main"})["default"] is None  # Gitea: no key
+    assert norm_branch({"name": "main", "default": True})["default"] is True
+    assert norm_branch({"name": "dev", "default": False})["default"] is False
+
+
+@pytest.mark.unit
+def test_not_connected_runner_is_offline():
+    from cicd_aiops.ops.runners import norm_runner
+
+    assert norm_runner({"id": 4, "status": "not_connected"})["online"] is False

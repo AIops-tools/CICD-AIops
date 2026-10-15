@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Gitea: `stale_work_audit` listed the **default branch** as stale with "Delete
+  the branch", and could report the default branch as unprotected while it was
+  protected. Gitea's branch rows carry no `default` key, which was read as
+  false; the default branch is now also recognised by the repository's
+  `default_branch` name.
+- Runners: a runner without the deprecated `online` flag was reported as
+  offline. `online` now falls back to `status` (online / offline / stale /
+  never_contacted) and is `null` when neither is reported; `runner_health_rca`
+  reports such a runner as "state not reported", not as an outage.
+- `list_branches` on Gitea reported the default branch as `default: false`;
+  the flag is now `null` when the platform does not report it. `cicd_overview`
+  adds `runnersStateUnknown` so runners of unknown state are not read as
+  offline, and the older GitLab status `not_connected` counts as not online.
+
 ## v0.12.0 — 2026-10-15
 
 ### Fixed

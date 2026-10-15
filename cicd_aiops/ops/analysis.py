@@ -286,7 +286,11 @@ def runner_health_rca(
     flagged_runners = []
     online_by_tag: dict[str, int] = {}
     for r in runners or []:
-        online = bool(r.get("online")) and str(r.get("status", "")).lower() != "offline"
+        reported = r.get("online")
+        online = (
+            None if reported is None
+            else bool(reported) and str(r.get("status", "")).lower() != "offline"
+        )
         contact_age_min = age_days(r.get("contactedAt"), now)
         contact_age_min = None if contact_age_min is None else contact_age_min * 1440.0
         stale = online and contact_age_min is not None and contact_age_min >= stale_contact_min
@@ -296,7 +300,13 @@ def runner_health_rca(
                 online_by_tag[tag] = online_by_tag.get(tag, 0) + 1
         if online and not stale and not paused:
             continue
-        if not online:
+        if online is None:
+            cause = "Runner state not reported — neither an online flag nor a known status"
+            action = (
+                "Check the runner in the CI server UI; this tool could not tell "
+                "whether it is online."
+            )
+        elif not online:
             cause = "Runner is offline (not contacting the server)"
             action = (
                 "Check the runner host/service and its registration token; "
@@ -526,8 +536,14 @@ def stale_work_audit(
 
     stale_branches = []
     protected_names = {s(p.get("branch")) for p in protections or []}
+    def _is_default(b: dict) -> bool:
+        # Gitea's Branch object has no `default` key: match the repo's name.
+        return bool(b.get("default")) or (
+            bool(default_branch) and s(b.get("name")) == s(default_branch)
+        )
+
     for b in branches or []:
-        if b.get("default"):
+        if _is_default(b):
             continue
         idle = age_days(b.get("lastCommitAt"), now)
         if idle is None or idle < stale_branch_days:
@@ -546,7 +562,7 @@ def stale_work_audit(
     gaps = []
     if default_branch:
         default_protected = any(
-            b.get("default") and b.get("protected") for b in branches or []
+            _is_default(b) and b.get("protected") for b in branches or []
         ) or s(default_branch) in protected_names
         if not default_protected:
             gaps.append(

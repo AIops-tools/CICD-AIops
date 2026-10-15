@@ -185,6 +185,19 @@ def test_list_runners_sorts_offline_first():
 
 
 @pytest.mark.unit
+def test_list_runners_sorts_when_some_state_is_unknown():
+    conn = _Conn({
+        _p(GITLAB, "runners"): [
+            {"id": 1, "description": "ok", "status": "online", "paused": False},
+            {"id": 2, "description": "mystery", "paused": False},
+        ]
+    })
+    out = runners.list_runners(conn)
+    assert "error" not in out, out
+    assert [r["online"] for r in out["runners"]] == [None, True]
+
+
+@pytest.mark.unit
 def test_runners_on_gitea_raise_teaching_error():
     conn = _Conn({}, platform=GITEA)
     with pytest.raises(KeyError, match="not available on platform 'gitea'"):
@@ -339,3 +352,18 @@ def test_cicd_overview_gitea_skips_runner_surface():
     out = overview.cicd_overview(conn)
     assert out["runnersTotal"] is None  # unsupported surface, not an error
     assert out["errors"] == []
+
+
+@pytest.mark.unit
+def test_overview_counts_runners_whose_state_is_unknown():
+    from cicd_aiops.ops import overview
+
+    conn = _Conn({
+        _p(GITLAB, "runners"): [
+            {"id": 1, "status": "online", "paused": False},
+            {"id": 2, "paused": False},
+        ]
+    })
+    out = overview.cicd_overview(conn)
+    assert out["runnersOnline"] == 1
+    assert out["runnersStateUnknown"] == 1

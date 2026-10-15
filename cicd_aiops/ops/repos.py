@@ -57,7 +57,9 @@ def norm_branch(r: dict) -> dict:
     commit = as_obj(r.get("commit"))
     return {
         "name": s(pick(r, "name")),
-        "default": bool(pick(r, "default", default=False)),
+        # Gitea's Branch object has no `default` key: unknown, not "not default"
+        # (stale_work_audit recognises the default branch by repo name).
+        "default": None if pick(r, "default") is None else bool(pick(r, "default")),
         "protected": bool(pick(r, "protected", default=False)),
         "lastCommitAt": opt(
             pick(commit, "committed_date", "timestamp", default=pick(r, "updated_at"))
