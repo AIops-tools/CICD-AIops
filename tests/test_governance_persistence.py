@@ -125,9 +125,9 @@ def test_real_write_tool_persists_priorstate_undo(gov_home, monkeypatch):
     """End-to-end through a REAL product write tool: pause_runner must capture
     the runner's prior paused state before flipping and persist the
     resume-undo on disk."""
+    from cicd_aiops.mcp_server.tools import writes as gov
     from cicd_aiops.ops import runners as runner_ops
     from cicd_aiops.platform import GITLAB, get_platform
-    from mcp_server.tools import writes as gov
 
     conn = MagicMock(name="conn")
     conn.target.platform = GITLAB

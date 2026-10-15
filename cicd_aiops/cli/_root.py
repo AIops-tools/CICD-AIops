@@ -56,7 +56,7 @@ def mcp_cmd() -> None:
         )
         raise typer.Exit(2)
 
-    from mcp_server.server import main as _mcp_main
+    from cicd_aiops.mcp_server.server import main as _mcp_main
 
     _mcp_main()
 

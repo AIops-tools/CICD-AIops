@@ -14,8 +14,8 @@ medium.
 from typing import Any, Optional
 
 from cicd_aiops.governance import governed_tool
+from cicd_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from cicd_aiops.ops import writes as ops
-from mcp_server._shared import _get_connection, mcp, tool_errors
 
 
 def _write_path(conn: Any, resource: str, **fmt: Any) -> str:

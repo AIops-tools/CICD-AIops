@@ -66,7 +66,7 @@ def runners_pause(
     dry_run: DryRunOption = False,
 ) -> None:
     """Pause a runner (governed write; undo-recorded)."""
-    from mcp_server.tools import writes as gov
+    from cicd_aiops.mcp_server.tools import writes as gov
 
     if dry_run:
         preview = gov.pause_runner(runner=runner, dry_run=True, target=target)
@@ -90,7 +90,7 @@ def runners_resume(
     dry_run: DryRunOption = False,
 ) -> None:
     """Resume a paused runner (governed write; undo-recorded)."""
-    from mcp_server.tools import writes as gov
+    from cicd_aiops.mcp_server.tools import writes as gov
 
     if dry_run:
         preview = gov.resume_runner(runner=runner, dry_run=True, target=target)

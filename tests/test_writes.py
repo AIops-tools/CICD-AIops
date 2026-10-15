@@ -240,8 +240,8 @@ def test_update_branch_protection_gitea_payload():
 def test_governed_pause_runner_records_undo_token(monkeypatch):
     """End-to-end: the governed pause_runner records an inverse in the undo store."""
     from cicd_aiops.governance.undo import get_undo_store
+    from cicd_aiops.mcp_server.tools import writes as t
     from cicd_aiops.ops import runners as runner_ops
-    from mcp_server.tools import writes as t
 
     conn = _conn()
     monkeypatch.setattr(runner_ops, "runner_detail", lambda c, r: {"id": r, "paused": False})
@@ -259,8 +259,8 @@ def test_governed_pause_of_already_paused_runner_records_no_undo(monkeypatch):
     """Pausing a runner that was already paused must NOT record a 'resume'
     undo — replaying it would flip the runner to a state it never had."""
     from cicd_aiops.governance.undo import get_undo_store
+    from cicd_aiops.mcp_server.tools import writes as t
     from cicd_aiops.ops import runners as runner_ops
-    from mcp_server.tools import writes as t
 
     conn = _conn()
     monkeypatch.setattr(runner_ops, "runner_detail", lambda c, r: {"id": r, "paused": True})
@@ -276,7 +276,7 @@ def test_governed_pause_of_already_paused_runner_records_no_undo(monkeypatch):
 
 @pytest.mark.unit
 def test_write_risk_tiers():
-    from mcp_server.tools import writes as t
+    from cicd_aiops.mcp_server.tools import writes as t
 
     assert t.delete_artifacts._risk_level == "high"
     for fn in (t.retry_pipeline, t.cancel_pipeline, t.pause_runner,
@@ -289,7 +289,7 @@ def test_write_risk_tiers():
 
 @pytest.mark.unit
 def test_dry_run_previews_do_not_mutate(monkeypatch):
-    from mcp_server.tools import writes as t
+    from cicd_aiops.mcp_server.tools import writes as t
 
     conn = _conn()
     conn.get.return_value = {}
@@ -309,8 +309,8 @@ def test_dry_run_previews_do_not_mutate(monkeypatch):
 
 @pytest.mark.unit
 def test_delete_artifacts_dry_run_reports_inventory_without_deleting(monkeypatch):
+    from cicd_aiops.mcp_server.tools import writes as t
     from cicd_aiops.ops import artifacts as artifact_ops
-    from mcp_server.tools import writes as t
 
     conn = _conn()
     monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
@@ -330,7 +330,7 @@ def test_delete_artifacts_dry_run_reports_inventory_without_deleting(monkeypatch
 
 @pytest.mark.unit
 def test_runner_undo_descriptors_invert():
-    from mcp_server.tools import writes as t
+    from cicd_aiops.mcp_server.tools import writes as t
 
     pause_undo = t._pause_runner_undo({"runner": "7"}, {"priorState": {"paused": False}})
     assert pause_undo["tool"] == "resume_runner"
@@ -346,7 +346,7 @@ def test_runner_undo_descriptors_invert():
 
 @pytest.mark.unit
 def test_protection_undo_replays_prior_settings():
-    from mcp_server.tools import writes as t
+    from cicd_aiops.mcp_server.tools import writes as t
 
     desc = t._protection_undo(
         {"project": "1", "branch": "main"},
@@ -369,8 +369,8 @@ def test_undo_descriptors_replay_against_target_tool_signature(monkeypatch):
     """The recorded undo params must be accepted verbatim by the target tool —
     replay the runner and protection undos end-to-end."""
     from cicd_aiops.connection import CicdApiError
+    from cicd_aiops.mcp_server.tools import writes as t
     from cicd_aiops.ops import runners as runner_ops
-    from mcp_server.tools import writes as t
 
     conn = _conn()
     conn.get.side_effect = CicdApiError("not found", status_code=404)
@@ -437,7 +437,7 @@ def test_per_job_delete_reports_unreadable_inventory_instead_of_zero(monkeypatch
 
 @pytest.mark.unit
 def test_preview_refuses_exactly_like_the_real_call(monkeypatch):
-    from mcp_server.tools import writes as t
+    from cicd_aiops.mcp_server.tools import writes as t
 
     _broken_inventory(monkeypatch)
     conn = _conn()
@@ -462,7 +462,7 @@ def test_readable_inventory_needs_no_acknowledgement(monkeypatch):
 
 @pytest.mark.unit
 def test_mcp_forwards_the_acknowledgement_to_the_real_call(monkeypatch):
-    from mcp_server.tools import writes as t
+    from cicd_aiops.mcp_server.tools import writes as t
 
     _broken_inventory(monkeypatch)
     conn = _conn()

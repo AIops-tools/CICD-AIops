@@ -61,7 +61,7 @@ def artifacts_delete(
     ] = False,
 ) -> None:
     """Delete a project's artifacts (governed write, HIGH risk, irreversible)."""
-    from mcp_server.tools import writes as gov
+    from cicd_aiops.mcp_server.tools import writes as gov
 
     scope = f"older than {older_than_days:g} days" if older_than_days else "ALL"
     if dry_run:

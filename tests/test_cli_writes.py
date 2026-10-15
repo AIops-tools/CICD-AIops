@@ -1,7 +1,7 @@
 """CLI confirmed-write path — past dry-run, through governance, onto disk.
 
 The CLI write commands delegate real execution to the ``@governed_tool``
-functions in ``mcp_server.tools``. These tests drive ``runners pause`` PAST the
+functions in ``cicd_aiops.mcp_server.tools``. These tests drive ``runners pause`` PAST the
 dry-run branch and the double-confirm prompts and assert the call really went
 through the governed path (audit row on disk) — the regression test for the
 "CLI writes were unaudited" line-wide fix.
@@ -36,8 +36,8 @@ def gov_home(tmp_path, monkeypatch):
 @pytest.fixture
 def gl_conn(monkeypatch):
     """A fake GitLab connection wired into the governed write module."""
+    from cicd_aiops.mcp_server.tools import writes as gov
     from cicd_aiops.ops import runners as runner_ops
-    from mcp_server.tools import writes as gov
 
     conn = MagicMock(name="conn")
     conn.target.platform = GITLAB
@@ -109,8 +109,8 @@ def test_cli_runners_pause_dry_run_on_gitea_refuses_nonzero(gov_home, monkeypatc
     is not told "here is what would happen" for a call that cannot happen.
     """
     from cicd_aiops.cli import app
+    from cicd_aiops.mcp_server.tools import writes as gov
     from cicd_aiops.platform import GITEA, get_platform
-    from mcp_server.tools import writes as gov
 
     conn = MagicMock(name="conn")
     conn.target.platform = GITEA
@@ -174,8 +174,8 @@ def test_cli_artifacts_delete_dry_run_reads_and_audits_but_never_writes(gov_home
 def test_cli_artifacts_delete_dry_run_on_gitea_refuses_nonzero(gov_home, monkeypatch):
     """Gitea has no bulk artifact-deletion API — refuse rather than promise it."""
     from cicd_aiops.cli import app
+    from cicd_aiops.mcp_server.tools import writes as gov
     from cicd_aiops.platform import GITEA, get_platform
-    from mcp_server.tools import writes as gov
 
     conn = MagicMock(name="conn")
     conn.target.platform = GITEA

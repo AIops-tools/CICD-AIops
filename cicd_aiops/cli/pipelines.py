@@ -103,7 +103,7 @@ def pipelines_retry(
     dry_run: DryRunOption = False,
 ) -> None:
     """Retry a failed/canceled pipeline (governed write)."""
-    from mcp_server.tools import writes as gov
+    from cicd_aiops.mcp_server.tools import writes as gov
 
     if dry_run:
         preview = gov.retry_pipeline(
@@ -130,7 +130,7 @@ def pipelines_cancel(
     dry_run: DryRunOption = False,
 ) -> None:
     """Cancel a running pipeline (governed write)."""
-    from mcp_server.tools import writes as gov
+    from cicd_aiops.mcp_server.tools import writes as gov
 
     if dry_run:
         preview = gov.cancel_pipeline(

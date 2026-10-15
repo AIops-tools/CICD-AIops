@@ -3,8 +3,8 @@
 from typing import Optional
 
 from cicd_aiops.governance import governed_tool
+from cicd_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from cicd_aiops.ops import projects as ops
-from mcp_server._shared import _get_connection, mcp, tool_errors
 
 
 @mcp.tool()

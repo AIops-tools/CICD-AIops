@@ -258,7 +258,7 @@ def test_storage_rca_flags_projects_whose_artifact_bytes_are_unknown():
 
 @pytest.mark.unit
 def test_undo_list_measures_truncation():
-    from mcp_server.tools import undo as gov
+    from cicd_aiops.mcp_server.tools import undo as gov
 
     out = gov.undo_list(limit=5)
     assert out["limit"] == 5 and out["truncated"] is False

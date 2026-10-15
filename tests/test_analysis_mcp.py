@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-import mcp_server.tools.analysis as t
+import cicd_aiops.mcp_server.tools.analysis as t
 
 
 @pytest.fixture
