@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.13.0 — 2026-10-15
 
 ### Fixed
 - Gitea: `stale_work_audit` listed the **default branch** as stale with "Delete
