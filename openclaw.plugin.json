@@ -11,7 +11,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "cicd-aiops==0.10.3",
+        "cicd-aiops==0.11.0",
         "cicd-aiops-mcp"
       ]
     }
