@@ -230,3 +230,26 @@ def test_cli_pipelines_cancel_confirmed_is_audited(gov_home, gl_conn, monkeypatc
     assert result.exit_code == 0, result.output
     gl_conn.post.assert_called_once()
     assert _audit_tools(gov_home / "audit.db") == ["cancel_pipeline"]
+
+
+@pytest.mark.unit
+def test_cli_bulk_delete_with_unreadable_inventory_refuses_then_honours_the_flag(
+    gov_home, gl_conn, monkeypatch
+):
+    """Refused without the flag (nonzero, nothing deleted); runs with it."""
+    from cicd_aiops.cli import app
+    from cicd_aiops.ops import artifacts as artifact_ops
+
+    monkeypatch.setattr(
+        artifact_ops, "list_artifacts", lambda c, p: {"error": "403 Forbidden", "project": p}
+    )
+    refused = CliRunner().invoke(app, ["artifacts", "delete", "1"], input="y\ny\n")
+    assert refused.exit_code != 0
+    assert "acknowledge_unknown_inventory" in refused.output
+    gl_conn.delete.assert_not_called()
+
+    ran = CliRunner().invoke(
+        app, ["artifacts", "delete", "1", "--acknowledge-unknown-inventory"], input="y\ny\n"
+    )
+    assert ran.exit_code == 2, ran.output  # queued bulk delete: outcome undetermined
+    gl_conn.delete.assert_called_once()

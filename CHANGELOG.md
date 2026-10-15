@@ -12,6 +12,17 @@
   level is published in `_meta` under `io.github.AIops-tools/riskLevel`. These
   are hints for the client; audit and undo are unchanged.
 
+### Fixed
+- `delete_artifacts`: when the artifact inventory read failed, the bulk delete
+  still ran and recorded `{count: 0, bytes: 0, complete: true}` — an
+  irreversible deletion recorded as having destroyed nothing — and the per-job
+  form reported the same "0, complete" while deleting nothing because it could
+  see nothing. Now the per-job form stops with an error, and the bulk form is
+  refused unless `acknowledge_unknown_inventory=True`
+  (CLI `--acknowledge-unknown-inventory`), in which case the inventory is
+  recorded as unknown (`null`, `inventoryError`), never as zero. The dry-run
+  preview refuses in exactly the same cases.
+
 ## v0.10.3 — 2026-09-15
 
 ### Fixed

@@ -67,6 +67,13 @@ trace.
 `delete_artifacts(older_than_days=N)` deletes per-job only artifacts created
 before the cutoff; `0` uses GitLab's bulk-delete of eligible artifacts.
 
+If the artifact inventory cannot be read, `delete_artifacts` does not run blind:
+the per-job form stops (it cannot tell which jobs match), and the bulk form is
+refused unless `acknowledge_unknown_inventory=True`
+(`--acknowledge-unknown-inventory`), in which case the inventory is recorded as
+unknown (`count`/`bytes` `null`, `inventoryError` set) — never as 0 files. The
+dry-run preview refuses in exactly the same cases.
+
 ## Safety plumbing
 
 - Every substituted URL path value is percent-encoded (`quote(..., safe="")`);

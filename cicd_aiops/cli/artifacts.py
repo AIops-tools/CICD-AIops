@@ -52,6 +52,13 @@ def artifacts_delete(
     ] = 0.0,
     target: TargetOption = None,
     dry_run: DryRunOption = False,
+    acknowledge_unknown_inventory: Annotated[
+        bool,
+        typer.Option(
+            "--acknowledge-unknown-inventory",
+            help="Run the bulk delete even if the artifact inventory cannot be read",
+        ),
+    ] = False,
 ) -> None:
     """Delete a project's artifacts (governed write, HIGH risk, irreversible)."""
     from mcp_server.tools import writes as gov
@@ -59,7 +66,11 @@ def artifacts_delete(
     scope = f"older than {older_than_days:g} days" if older_than_days else "ALL"
     if dry_run:
         preview = gov.delete_artifacts(
-            project=project, older_than_days=older_than_days, dry_run=True, target=target
+            project=project,
+            older_than_days=older_than_days,
+            dry_run=True,
+            acknowledge_unknown_inventory=acknowledge_unknown_inventory,
+            target=target,
         )
         would = preview.get("wouldDelete", {}) if isinstance(preview, dict) else {}
         dry_run_preview(
@@ -78,6 +89,9 @@ def artifacts_delete(
     double_confirm(f"delete artifacts ({scope})", project)
     emit_governed(
         gov.delete_artifacts(
-            project=project, older_than_days=older_than_days, target=target
+            project=project,
+            older_than_days=older_than_days,
+            acknowledge_unknown_inventory=acknowledge_unknown_inventory,
+            target=target,
         )
     )

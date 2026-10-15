@@ -387,3 +387,101 @@ def test_undo_descriptors_replay_against_target_tool_signature(monkeypatch):
     )
     replay = t.update_branch_protection(**prot_undo["params"])
     assert replay["action"] == "update_branch_protection" and "error" not in replay
+
+
+# ── unreadable inventory: an irreversible delete must not run blind ──────────
+
+
+def _broken_inventory(monkeypatch):
+    from cicd_aiops.ops import artifacts as artifact_ops
+
+    monkeypatch.setattr(
+        artifact_ops, "list_artifacts", lambda c, p: {"error": "403 Forbidden", "project": p}
+    )
+
+
+@pytest.mark.unit
+def test_bulk_delete_refuses_when_inventory_is_unreadable(monkeypatch):
+    from cicd_aiops.ops import writes as ops
+
+    _broken_inventory(monkeypatch)
+    conn = _conn()
+    with pytest.raises(ValueError, match="acknowledge_unknown_inventory"):
+        ops.delete_artifacts(conn, "1")
+    conn.delete.assert_not_called()
+
+
+@pytest.mark.unit
+def test_bulk_delete_with_acknowledgement_records_unknown_not_zero(monkeypatch):
+    from cicd_aiops.ops import writes as ops
+
+    _broken_inventory(monkeypatch)
+    conn = _conn()
+    out = ops.delete_artifacts(conn, "1", acknowledge_unknown_inventory=True)
+    conn.delete.assert_called_once()
+    inv = out["inventoryAtRequest"]
+    assert inv["count"] is None and inv["bytes"] is None and inv["complete"] is False
+    assert "403" in inv["inventoryError"]
+
+
+@pytest.mark.unit
+def test_per_job_delete_reports_unreadable_inventory_instead_of_zero(monkeypatch):
+    from cicd_aiops.ops import writes as ops
+
+    _broken_inventory(monkeypatch)
+    conn = _conn()
+    with pytest.raises(ValueError, match="nothing was deleted"):
+        ops.delete_artifacts(conn, "1", older_than_days=30, acknowledge_unknown_inventory=True)
+    conn.delete.assert_not_called()
+
+
+@pytest.mark.unit
+def test_preview_refuses_exactly_like_the_real_call(monkeypatch):
+    from mcp_server.tools import writes as t
+
+    _broken_inventory(monkeypatch)
+    conn = _conn()
+    monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
+    out = t.delete_artifacts(project="1", dry_run=True)
+    assert "acknowledge_unknown_inventory" in out["error"]
+    ok = t.delete_artifacts(project="1", dry_run=True, acknowledge_unknown_inventory=True)
+    assert ok["dryRun"] is True and ok["wouldDelete"]["currentCount"] is None
+    assert "403" in ok["wouldDelete"]["inventoryError"]
+    conn.delete.assert_not_called()
+
+
+@pytest.mark.unit
+def test_readable_inventory_needs_no_acknowledgement(monkeypatch):
+    from cicd_aiops.ops import artifacts as artifact_ops
+    from cicd_aiops.ops import writes as ops
+
+    monkeypatch.setattr(artifact_ops, "list_artifacts", lambda c, p: {"artifacts": []})
+    out = ops.delete_artifacts(_conn(), "1")
+    assert out["inventoryAtRequest"] == {"count": 0, "bytes": 0, "complete": True}
+
+
+@pytest.mark.unit
+def test_mcp_forwards_the_acknowledgement_to_the_real_call(monkeypatch):
+    from mcp_server.tools import writes as t
+
+    _broken_inventory(monkeypatch)
+    conn = _conn()
+    monkeypatch.setattr(t, "_get_connection", lambda target=None: conn)
+    out = t.delete_artifacts(project="1", acknowledge_unknown_inventory=True)
+    assert out["inventoryAtRequest"]["count"] is None
+    conn.delete.assert_called_once()
+
+
+@pytest.mark.unit
+def test_unsupported_platform_is_reported_before_the_inventory(monkeypatch):
+    from cicd_aiops.ops import writes as ops
+    from cicd_aiops.platform import GITEA, get_platform
+
+    _broken_inventory(monkeypatch)
+    conn = _conn()
+    conn.target.platform = GITEA
+    conn.platform = get_platform(GITEA)
+    with pytest.raises(KeyError) as exc:
+        ops.delete_artifacts(conn, "o/r")
+    assert "acknowledge" not in str(exc.value)
+    conn.delete.assert_not_called()

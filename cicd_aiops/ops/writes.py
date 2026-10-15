@@ -116,16 +116,61 @@ def resume_runner(conn: Any, runner: str) -> dict:
 _TRACE_FILE_TYPE = "trace"
 
 
-def delete_artifacts(conn: Any, project: str, older_than_days: float = 0.0) -> dict:
+def check_artifact_inventory(
+    inventory: dict, project: str, older_than_days: float, acknowledge_unknown_inventory: bool
+) -> str | None:
+    """Refuse an irreversible delete that cannot say what it would destroy.
+
+    Returns the inventory error when the caller acknowledged it (bulk delete
+    only), ``None`` when the inventory was read. Shared by the real call and its
+    preview so the two refuse identically.
+    """
+    error = inventory.get("error")
+    if not error:
+        return None
+    if older_than_days and older_than_days > 0:
+        raise ValueError(
+            f"Artifact inventory for project {s(project)} could not be read "
+            f"({s(error, 200)}), so the artifacts older than {older_than_days:g} days "
+            "cannot be identified; nothing was deleted."
+        )
+    if not acknowledge_unknown_inventory:
+        raise ValueError(
+            f"Artifact inventory for project {s(project)} could not be read "
+            f"({s(error, 200)}). The bulk delete is irreversible and would run without a "
+            "record of what it destroys. Fix the read, or pass "
+            "acknowledge_unknown_inventory=True to delete anyway."
+        )
+    return s(error, 200)
+
+
+def delete_artifacts(
+    conn: Any,
+    project: str,
+    older_than_days: float = 0.0,
+    acknowledge_unknown_inventory: bool = False,
+) -> dict:
     """[WRITE][high] Delete a project's artifacts (all, or older than N days).
 
     IRREVERSIBLE — before deleting, the current artifact inventory is read so
-    priorState records exactly how many files/bytes are being destroyed.
+    priorState records exactly how many files/bytes are being destroyed. If that
+    read fails, the per-job delete stops (it cannot tell which jobs match) and
+    the bulk delete refuses unless ``acknowledge_unknown_inventory=True``; an
+    acknowledged blind delete records the inventory as unknown, never as 0.
     ``older_than_days > 0`` deletes per-job only the artifacts created before
     the cutoff; ``0`` uses the server's bulk-delete (eligible artifacts).
     """
+    # Resolve the delete surface first: on a platform without one the honest
+    # answer is "unsupported", not a refusal about an unreadable inventory.
+    if older_than_days and older_than_days > 0:
+        conn.platform.path("job_artifacts_delete", project=project, job="0")
+    else:
+        conn.platform.path("artifacts_delete", project=project)
     inventory = artifact_ops.list_artifacts(conn, project)
-    rows = inventory.get("artifacts", []) if "error" not in inventory else []
+    inventory_error = check_artifact_inventory(
+        inventory, project, older_than_days, acknowledge_unknown_inventory
+    )
+    rows = [] if inventory_error else inventory.get("artifacts", [])
     # The inventory read is itself bounded; say so rather than letting a
     # partial count read as an exact one.
     inventory_partial = bool(
@@ -164,6 +209,10 @@ def delete_artifacts(conn: Any, project: str, older_than_days: float = 0.0) -> d
         "bytes": sum(as_int(a.get("sizeBytes")) for a in deleted_rows),
         "complete": not inventory_partial,
     }
+    if inventory_error:
+        # Acknowledged blind delete: what existed is unknown, never "0 files".
+        prior = {"count": None, "bytes": None, "complete": False,
+                 "inventoryError": inventory_error}
     if queued:
         out = mark_unknown({
             "action": "delete_artifacts",

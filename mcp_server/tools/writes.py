@@ -242,6 +242,7 @@ def delete_artifacts(
     project: str,
     older_than_days: float = 0.0,
     dry_run: bool = False,
+    acknowledge_unknown_inventory: bool = False,
     target: Optional[str] = None,
 ) -> dict:
     """[WRITE][risk=high] Delete a project's artifacts (all, or older than N days).
@@ -255,6 +256,9 @@ def delete_artifacts(
         older_than_days: Only delete artifacts created before this many days
             ago; 0 = the server's bulk delete of all eligible artifacts.
         dry_run: If True, preview without deleting.
+        acknowledge_unknown_inventory: Allow the bulk delete when the artifact
+            inventory cannot be read (it is refused otherwise, because nothing
+            would record what was destroyed). Never applies to older_than_days.
         target: Server target name from config; omit for the default.
     """
     conn = _get_connection(target)
@@ -271,6 +275,11 @@ def delete_artifacts(
         else:
             path = _write_path(conn, "artifacts_delete", project=project)
         inventory = artifact_ops.list_artifacts(conn, project)
+        # Same refusal as the real call (a preview that says yes to a call the
+        # real path refuses is bug class #10).
+        inventory_error = ops.check_artifact_inventory(
+            inventory, project, older_than_days, acknowledge_unknown_inventory
+        )
         return {
             "dryRun": True,
             "wouldDelete": {
@@ -287,9 +296,16 @@ def delete_artifacts(
                 "currentCount": inventory.get("artifactsFound"),
                 "currentBytes": inventory.get("totalBytes"),
                 "expiredButKept": inventory.get("expiredButKept"),
+                # Why the counts above are null when the read was acknowledged.
+                "inventoryError": inventory_error,
             },
         }
-    return ops.delete_artifacts(conn, project, older_than_days=older_than_days)
+    return ops.delete_artifacts(
+        conn,
+        project,
+        older_than_days=older_than_days,
+        acknowledge_unknown_inventory=acknowledge_unknown_inventory,
+    )
 
 
 # ── branch protection (reversible — undo replays prior settings) ─────────────

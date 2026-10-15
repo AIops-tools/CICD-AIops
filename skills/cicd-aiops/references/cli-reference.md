@@ -38,7 +38,7 @@ cicd-aiops runners resume <runner> [--dry-run]    # governed write, undo-recorde
 
 ```bash
 cicd-aiops artifacts list <project>
-cicd-aiops artifacts delete <project> [--older-than-days 30] [--dry-run]
+cicd-aiops artifacts delete <project> [--older-than-days 30] [--dry-run] [--acknowledge-unknown-inventory]
 # risk=high: requires CICD_AUDIT_APPROVED_BY (+ CICD_AUDIT_RATIONALE)
 ```
 
