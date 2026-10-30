@@ -51,3 +51,20 @@ zhouwei008@gmail.com. Please do not open public issues for exploitable bugs.
 
 No webhooks, no telemetry, no outbound calls beyond the configured GitLab /
 Gitea REST API.
+
+## Audit availability and telemetry
+
+Real writes first commit a `pending` audit intent. If audit storage is unavailable,
+the upstream write does not start. If finalization fails after an upstream call,
+the intent stays visible and further writes in that process are blocked. Check
+that the process is no longer executing and verify server state before calling
+`AuditEngine.reconcile_pending(audit_id)` to mark the intent `unknown`.
+
+Reads and dry-run previews continue when audit storage fails, with a warning
+rather than a durable row. New audit rows store outcome summaries instead of
+full business responses; older rows and rotated archives are not rewritten
+automatically. Parameter redaction still follows each tool's
+`sensitive_params`. `AIOPS_WORKFLOW_ID` supplies a correlation ID, and optional
+`AIOPS_TELEMETRY=1` emits metadata-only JSON logs. `AuditEngine.health()`
+reports availability, write blocking, failure count, and pending intent count.
+On POSIX the rotation lock spans processes; on Windows it is process-local.

@@ -2,6 +2,8 @@
 
 # CICD AIops
 
+> **Audit availability:** Real writes require a committed `pending` audit row and stop before contacting the platform if storage is unavailable. Reads and previews may continue with a warning; new audit rows store outcome summaries rather than full responses.
+
 **Governed AI-ops for self-managed GitLab and self-hosted Gitea.**
 
 `cicd-aiops` is for the team running its *own* CI/CD forge — a GitLab instance
@@ -145,7 +147,7 @@ flag carries its numbers.
 Every MCP tool and every CLI write runs through the vendored harness in
 `cicd_aiops/governance/`. It records; it does not authorize (see above).
 
-- **Audit** — every call (params, result, status, duration, risk tier, and any
+- **Audit** — every call (params, outcome summary, status, duration, risk tier, and any
   operator-supplied approver/rationale) is logged to `~/.cicd-aiops/audit.db`
   (relocatable via `CICD_AIOPS_HOME`). The CLI writes the same row the MCP path
   does — there is no unaudited entry point.
